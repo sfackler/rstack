@@ -3,7 +3,7 @@ extern crate ctest;
 fn main() {
     let mut cfg = ctest::TestGenerator::new();
 
-    if cfg!(feature = "local") {
+    if cfg!(feature = "native") {
         cfg.cfg("feature", Some("native"));
     }
     if cfg!(feature = "ptrace") {

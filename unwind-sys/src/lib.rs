@@ -30,14 +30,17 @@ pub const UNW_EINVAL: c_int = 8;
 pub const UNW_EBADVERSION: c_int = 9;
 pub const UNW_ENOINFO: c_int = 10;
 
-pub const UNW_CACHE_NONE: c_int = 0;
-pub const UNW_CACHE_GLOBAL: c_int = 1;
-pub const UNW_CACHE_PER_THREAD: c_int = 2;
-
 pub type unw_regnum_t = c_int;
 
 pub enum unw_addr_space {}
 pub type unw_addr_space_t = *mut unw_addr_space;
+
+#[repr(C)]
+pub enum unw_caching_policy_t {
+    UNW_CACHE_NONE,
+    UNW_CACHE_GLOBAL,
+    UNW_CACHE_PER_THREAD,
+}
 
 #[repr(C)]
 pub enum unw_save_loc_type_t {
