@@ -1,14 +1,15 @@
 [package]
-name = "unwind-sys"
+name = "systest"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
 
 [features]
-native = []
-ptrace = ["native"]
+native = ["unwind-sys/native"]
+ptrace = ["unwind-sys/ptrace"]
 
 [dependencies]
+unwind-sys = { path = "../unwind-sys" }
 libc = "0.2"
 
 [build-dependencies]
-pkg-config = "0.3"
+ctest = "0.1"

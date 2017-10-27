@@ -7,3 +7,7 @@ authors = ["Steven Fackler <sfackler@palantir.com>"]
 unwind-sys = { path = "unwind-sys" }
 
 [workspace]
+members = [
+    "systest",
+    "unwind-sys",
+]
