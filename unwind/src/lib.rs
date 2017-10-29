@@ -206,13 +206,14 @@ pub struct ProcedureInfo {
     _p: (),
 }
 
-pub struct Cursor<'a>(unw_cursor_t, PhantomData<(&'a mut ())>);
+#[derive(Clone)]
+pub struct Cursor<'a>(unw_cursor_t, PhantomData<(&'a ())>);
 
 impl<'a> Cursor<'a> {
-    pub fn local(context: &'a mut Context) -> Result<Cursor<'a>> {
+    pub fn local(context: &'a Context) -> Result<Cursor<'a>> {
         unsafe {
             let mut cursor: Cursor<'a> = mem::uninitialized();
-            let ret = unw_init_local(&mut cursor.0, &mut context.0);
+            let ret = unw_init_local(&mut cursor.0, &context.0 as *const _ as *mut _);
             if ret != UNW_ESUCCESS {
                 return Err(Error(ret));
             }
@@ -226,14 +227,14 @@ impl<'a> Cursor<'a> {
 
     pub fn remote<T>(
         address_space: &'a AddressSpaceRef<T>,
-        state: &'a mut T,
+        state: &'a T,
     ) -> Result<Cursor<'a>> {
         unsafe {
             let mut cursor = mem::uninitialized();
             let ret = unw_init_remote(
                 &mut cursor,
                 address_space.as_ptr(),
-                state as *mut T as *mut c_void,
+                state as *const T as *mut c_void,
             );
             if ret == UNW_ESUCCESS {
                 Ok(Cursor(cursor, PhantomData))

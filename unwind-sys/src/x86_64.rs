@@ -35,6 +35,7 @@ pub const UNW_TDEP_BP: c_int = UNW_X86_64_RBP;
 pub const UNW_TDEP_EH: c_int = UNW_X86_64_RAX;
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct unw_tdep_save_loc_t {
     pub unused: c_char,
 }
@@ -42,6 +43,7 @@ pub struct unw_tdep_save_loc_t {
 pub type unw_tdep_context_t = ucontext_t;
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct unw_tdep_proc_info_t {
     pub unused: c_char,
 }

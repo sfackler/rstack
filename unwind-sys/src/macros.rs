@@ -2,6 +2,7 @@
 macro_rules! make_api {
     () => {
         #[repr(C)]
+        #[derive(Copy, Clone)]
         pub struct unw_cursor_t {
             pub opaque: [unw_word_t; UNW_TDEP_CURSOR_LEN as usize],
         }
@@ -9,6 +10,7 @@ macro_rules! make_api {
         pub type unw_context_t = unw_tdep_context_t;
 
         #[repr(C)]
+        #[derive(Copy, Clone)]
         pub struct unw_proc_info_t {
             pub start_ip: unw_word_t,
             pub end_ip: unw_word_t,
