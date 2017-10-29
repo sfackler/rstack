@@ -1,5 +1,3 @@
-#![allow(improper_ctypes)] // zero sized structs are UB in C D:
-
 use libc::{c_char, c_int, c_void, size_t, ucontext_t};
 
 pub use ::*;
@@ -37,12 +35,16 @@ pub const UNW_TDEP_BP: c_int = UNW_X86_64_RBP;
 pub const UNW_TDEP_EH: c_int = UNW_X86_64_RAX;
 
 #[repr(C)]
-pub struct unw_tdep_save_loc_t {}
+pub struct unw_tdep_save_loc_t {
+    pub unused: c_char,
+}
 
 pub type unw_tdep_context_t = ucontext_t;
 
 #[repr(C)]
-pub struct unw_tdep_proc_info_t {}
+pub struct unw_tdep_proc_info_t {
+    pub unused: c_char,
+}
 
 extern "C" {
     pub fn _Ux86_64_getcontext(ctx: *mut unw_tdep_context_t) -> c_int;
@@ -85,19 +87,21 @@ extern "C" {
         len: size_t,
         offp: *mut unw_word_t,
     ) -> c_int;
+
+    pub static _Ux86_64_local_addr_space: unw_addr_space_t;
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_getcontext(ctx: *mut unw_context_t) -> c_int {
     _Ux86_64_getcontext(ctx)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_init_local(cur: *mut unw_cursor_t, ctx: *mut unw_context_t) -> c_int {
     _Ux86_64_init_local(cur, ctx)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_init_remote(
     cur: *mut unw_cursor_t,
     spc: unw_addr_space_t,
@@ -106,12 +110,12 @@ pub unsafe extern "C" fn unw_init_remote(
     _Ux86_64_init_remote(cur, spc, p)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_step(cur: *mut unw_cursor_t) -> c_int {
     _Ux86_64_step(cur)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_get_reg(
     cur: *mut unw_cursor_t,
     reg: unw_regnum_t,
@@ -120,7 +124,7 @@ pub unsafe extern "C" fn unw_get_reg(
     _Ux86_64_get_reg(cur, reg, valp)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_set_reg(
     cur: *mut unw_cursor_t,
     reg: unw_regnum_t,
@@ -129,12 +133,12 @@ pub unsafe extern "C" fn unw_set_reg(
     _Ux86_64_set_reg(cur, reg, val)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_resume(cur: *mut unw_cursor_t) -> c_int {
     _Ux86_64_resume(cur)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_create_addr_space(
     accessors: *mut unw_accessors_t,
     byteorder: c_int,
@@ -142,22 +146,22 @@ pub unsafe extern "C" fn unw_create_addr_space(
     _Ux86_64_create_addr_space(accessors, byteorder)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_destroy_addr_space(spc: unw_addr_space_t) {
     _Ux86_64_destroy_addr_space(spc)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_get_accessors(spc: unw_addr_space_t) -> *mut unw_accessors_t {
     _Ux86_64_get_accessors(spc)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_flush_cache(spc: unw_addr_space_t, lo: unw_word_t, hi: unw_word_t) {
     _Ux86_64_flush_cache(spc, lo, hi)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_set_caching_policy(
     spc: unw_addr_space_t,
     policy: unw_caching_policy_t,
@@ -165,12 +169,12 @@ pub unsafe extern "C" fn unw_set_caching_policy(
     _Ux86_64_set_caching_policy(spc, policy)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_regname(reg: unw_regnum_t) -> *const c_char {
     _Ux86_64_regname(reg)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_get_proc_info(
     cur: *mut unw_cursor_t,
     info: *mut unw_proc_info_t,
@@ -178,7 +182,7 @@ pub unsafe extern "C" fn unw_get_proc_info(
     _Ux86_64_get_proc_info(cur, info)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_get_save_loc(
     cur: *mut unw_cursor_t,
     a: c_int,
@@ -187,17 +191,17 @@ pub unsafe extern "C" fn unw_get_save_loc(
     _Ux86_64_get_save_loc(cur, a, p)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_is_fpreg(reg: unw_regnum_t) -> c_int {
     _Ux86_64_is_fpreg(reg)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_is_signal_frame(cur: *mut unw_cursor_t) -> c_int {
     _Ux86_64_is_signal_frame(cur)
 }
 
-#[inline]
+#[inline(always)]
 pub unsafe extern "C" fn unw_get_proc_name(
     cur: *mut unw_cursor_t,
     buf: *mut c_char,

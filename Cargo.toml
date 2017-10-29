@@ -9,5 +9,6 @@ unwind-sys = { path = "unwind-sys" }
 [workspace]
 members = [
     "systest",
+    "unwind",
     "unwind-sys",
 ]
