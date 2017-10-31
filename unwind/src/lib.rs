@@ -1,10 +1,11 @@
-extern crate unwind_sys;
 extern crate libc;
+extern crate unwind_sys;
 
+#[macro_use]
 extern crate foreign_types;
 
 use foreign_types::Opaque;
-use libc::{c_int, c_void, c_char};
+use libc::{c_char, c_int, c_void};
 use std::fmt;
 use std::error;
 use std::mem;
@@ -99,19 +100,7 @@ impl Byteorder {
 }
 
 #[cfg(feature = "ptrace")]
-pub struct PTraceState(*mut libc::c_void);
-
-#[cfg(feature = "ptrace")]
-impl Drop for PTraceState {
-    pub fn drop(&mut self) {
-        unsafe {
-            _UPT_destroy(self.0);
-        }
-    }
-}
-
-#[cfg(feature = "ptrace")]
-foreign_types! {
+foreign_type! {
     type CType = c_void;
     fn drop = _UPT_destroy;
 
@@ -122,14 +111,14 @@ foreign_types! {
 
 #[cfg(feature = "ptrace")]
 impl PTraceState {
-    pub fn new(pid: pid_t) -> Result<PTraceState> {
+    pub fn new(pid: u32) -> Result<PTraceState> {
         unsafe {
-            let ptr = _UPT_create(pid);
+            let ptr = _UPT_create(pid as _);
             if ptr.is_null() {
                 // this is documented to only fail on OOM
                 Err(Error(-UNW_ENOMEM))
             } else {
-                PTraceState(ptr)
+                Ok(PTraceState(ptr))
             }
         }
     }
@@ -137,10 +126,11 @@ impl PTraceState {
 
 pub struct Accessors<T>(unw_accessors_t, PhantomData<T>);
 
-impl<T> Accessors<T> {
-    #[cfg(feature = "ptrace")]
-    pub const PTRACE: &'static Accessors<PTraceStateRef> =
-        unsafe { &*(_UPT_accessors as *const Accessors<PTraceStateRef>) };
+#[cfg(feature = "ptrace")]
+impl Accessors<PTraceStateRef> {
+    pub fn ptrace() -> &'static Accessors<PTraceStateRef> {
+        unsafe { &*(&_UPT_accessors as *const unw_accessors_t as *const Accessors<PTraceStateRef>) }
+    }
 }
 
 pub struct AddressSpace<T>(unw_addr_space_t, PhantomData<T>);
@@ -225,10 +215,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn remote<T>(
-        address_space: &'a AddressSpaceRef<T>,
-        state: &'a T,
-    ) -> Result<Cursor<'a>> {
+    pub fn remote<T>(address_space: &'a AddressSpaceRef<T>, state: &'a T) -> Result<Cursor<'a>> {
         unsafe {
             let mut cursor = mem::uninitialized();
             let ret = unw_init_remote(
@@ -346,5 +333,68 @@ mod test {
             bar();
         }
         foo();
+    }
+
+    #[test]
+    #[cfg(feature = "ptrace")]
+    fn remote() {
+        use std::process::Command;
+        use std::io;
+        use std::ptr;
+
+        let mut child = Command::new("sleep").arg("10").spawn().unwrap();
+        unsafe {
+            let ret = libc::ptrace(
+                libc::PTRACE_ATTACH,
+                child.id() as libc::pid_t,
+                ptr::null_mut::<c_void>(),
+                ptr::null_mut::<c_void>(),
+            );
+            if ret != 0 {
+                panic!("{}", io::Error::last_os_error());
+            }
+
+            loop {
+                let mut status = 0;
+                let ret = libc::waitpid(child.id() as libc::pid_t, &mut status, 0);
+                if ret < 0 {
+                    panic!("{}", io::Error::last_os_error());
+                }
+                if libc::WIFSTOPPED(status) {
+                    break;
+                }
+            }
+        }
+        let state = PTraceState::new(child.id() as _).unwrap();
+        let address_space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT).unwrap();
+        let mut cursor = Cursor::remote(&address_space, &state).unwrap();
+
+        let mut buf = [0; 256];
+        loop {
+            let ip = cursor.register(RegNum::IP).unwrap();
+            let info = cursor.procedure_info().unwrap();
+            let mut offset = 0;
+            match cursor.procedure_name(&mut buf, &mut offset) {
+                Ok(()) => {}
+                Err(Error::NOMEM) => {}
+                Err(e) => panic!("{}", e),
+            }
+
+            let len = buf.iter().position(|b| *b == 0).unwrap();
+            let name = str::from_utf8(&buf[..len]).unwrap();
+            println!(
+                "{:#x} - {} ({:#x}) + {:#x}",
+                ip,
+                name,
+                info.start_ip,
+                offset
+            );
+
+            if !cursor.step().unwrap() {
+                break;
+            }
+        }
+
+        child.kill().unwrap();
     }
 }
