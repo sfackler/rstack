@@ -2,6 +2,7 @@ extern crate libc;
 extern crate unwind_sys;
 
 #[macro_use]
+#[allow(unused_imports)]
 extern crate foreign_types;
 
 use foreign_types::Opaque;
@@ -54,23 +55,6 @@ impl fmt::Display for Error {
 impl error::Error for Error {
     fn description(&self) -> &str {
         "libunwind error"
-    }
-}
-
-pub struct Context(unw_context_t);
-
-impl Context {
-    #[inline(never)] // See Cursor::new for why this is
-    pub fn new() -> Result<Context> {
-        unsafe {
-            let mut context = mem::uninitialized();
-            let ret = unw_getcontext(&mut context);
-            if ret == UNW_ESUCCESS {
-                Ok(Context(context))
-            } else {
-                Err(Error(ret))
-            }
-        }
     }
 }
 
@@ -200,18 +184,24 @@ pub struct ProcedureInfo {
 pub struct Cursor<'a>(unw_cursor_t, PhantomData<(&'a ())>);
 
 impl<'a> Cursor<'a> {
-    pub fn local(context: &'a Context) -> Result<Cursor<'a>> {
+    pub fn local<F, T>(f: F) -> Result<T>
+    where
+        F: FnOnce(Cursor) -> Result<T>,
+    {
         unsafe {
-            let mut cursor: Cursor<'a> = mem::uninitialized();
-            let ret = unw_init_local(&mut cursor.0, &context.0 as *const _ as *mut _);
+            let mut context = mem::uninitialized();
+            let ret = unw_getcontext(&mut context);
             if ret != UNW_ESUCCESS {
                 return Err(Error(ret));
             }
 
-            // https://github.com/libunwind/libunwind/issues/53
-            // skips past the Context::new frame since it's inline(never)
-            cursor.step()?;
-            Ok(cursor)
+            let mut cursor = mem::uninitialized();
+            let ret = unw_init_local(&mut cursor, &mut context);
+            if ret != UNW_ESUCCESS {
+                return Err(Error(ret));
+            }
+
+            f(Cursor(cursor, PhantomData))
         }
     }
 
@@ -300,34 +290,35 @@ mod test {
     #[test]
     fn local() {
         fn bar() {
-            let mut context = Context::new().unwrap();
-            let mut cursor = Cursor::local(&mut context).unwrap();
+            Cursor::local(|mut cursor| {
+                let mut buf = [0; 256];
+                loop {
+                    let ip = cursor.register(RegNum::IP).unwrap();
+                    let info = cursor.procedure_info().unwrap();
+                    let mut offset = 0;
+                    match cursor.procedure_name(&mut buf, &mut offset) {
+                        Ok(()) => {}
+                        Err(Error::NOMEM) => {}
+                        Err(e) => panic!("{}", e),
+                    }
 
-            let mut buf = [0; 256];
-            loop {
-                let ip = cursor.register(RegNum::IP).unwrap();
-                let info = cursor.procedure_info().unwrap();
-                let mut offset = 0;
-                match cursor.procedure_name(&mut buf, &mut offset) {
-                    Ok(()) => {}
-                    Err(Error::NOMEM) => {}
-                    Err(e) => panic!("{}", e),
+                    let len = buf.iter().position(|b| *b == 0).unwrap();
+                    let name = str::from_utf8(&buf[..len]).unwrap();
+                    println!(
+                        "{:#x} - {} ({:#x}) + {:#x}",
+                        ip,
+                        name,
+                        info.start_ip,
+                        offset
+                    );
+
+                    if !cursor.step().unwrap() {
+                        break;
+                    }
                 }
 
-                let len = buf.iter().position(|b| *b == 0).unwrap();
-                let name = str::from_utf8(&buf[..len]).unwrap();
-                println!(
-                    "{:#x} - {} ({:#x}) + {:#x}",
-                    ip,
-                    name,
-                    info.start_ip,
-                    offset
-                );
-
-                if !cursor.step().unwrap() {
-                    break;
-                }
-            }
+                Ok(())
+            }).unwrap();
         }
         fn foo() {
             bar();
