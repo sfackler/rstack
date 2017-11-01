@@ -190,7 +190,7 @@ impl<'a> Cursor<'a> {
     {
         unsafe {
             let mut context = mem::uninitialized();
-            let ret = unw_getcontext(&mut context);
+            let ret = unw_tdep_getcontext(&mut context);
             if ret != UNW_ESUCCESS {
                 return Err(Error(ret));
             }
