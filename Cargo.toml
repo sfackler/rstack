@@ -4,7 +4,10 @@ version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
 
 [dependencies]
-unwind-sys = { path = "unwind-sys" }
+libc = "0.2"
+log = "0.3"
+
+unwind = { path = "unwind", features = ["ptrace"] }
 
 [workspace]
 members = [
