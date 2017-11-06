@@ -4,6 +4,9 @@ extern crate unwind;
 #[macro_use]
 extern crate log;
 
+#[cfg(test)]
+extern crate env_logger;
+
 use libc::{c_void, pid_t, ptrace, waitpid, EPERM, PTRACE_DETACH, PTRACE_INTERRUPT, PTRACE_SEIZE,
            WIFSTOPPED, __WALL};
 use std::borrow::Borrow;
@@ -290,11 +293,14 @@ impl TracedThread {
                         let len = buf.len() * 2;
                         buf.resize(len, 0);
                     }
-                    Err(e) => debug!(
-                        "error retreiving procedure name for thread {}: {}",
-                        self.0,
-                        e
-                    ),
+                    Err(e) => {
+                        debug!(
+                            "error retrieving procedure name for thread {}: {}",
+                            self.0,
+                            e
+                        );
+                        break;
+                    }
                 }
             }
 
@@ -336,6 +342,8 @@ mod test {
 
     #[test]
     fn traced_thread() {
+        let _ = env_logger::init();
+
         let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT).unwrap();
 
         let mut child = Command::new("sleep").arg("10").spawn().unwrap();
@@ -344,12 +352,12 @@ mod test {
         let trace = thread.dump(&space).unwrap();
         drop(thread);
 
-        for frame in &trace.trace {
+        for frame in &trace {
             println!(
                 "{:#x} - {} + {:#x}",
-                frame.ip().unwrap_or(0),
-                frame.name().unwrap_or("<unknown>"),
-                frame.offset().unwrap_or(0)
+                frame.ip(),
+                frame.name().map_or("<unknown>", |s| s.name()),
+                frame.name().map_or(0, |s| s.offset())
             );
         }
 

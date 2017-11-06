@@ -9,6 +9,9 @@ log = "0.3"
 
 unwind = { path = "unwind", features = ["ptrace"] }
 
+[dev-dependencies]
+env_logger = "0.4"
+
 [workspace]
 members = [
     "systest",
