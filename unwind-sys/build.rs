@@ -16,6 +16,6 @@ fn main() {
     }
 
     println!("cargo:version={}", library.version);
-    let includedir = pkg_config::get_variable("libunwind", "includedir").unwrap();
+    let includedir = pkg_config::get_variable(lib, "includedir").unwrap();
     println!("cargo:includedir={}", includedir);
 }
