@@ -1,14 +1,15 @@
 extern crate ctest;
 
+use std::env;
+
 fn main() {
     let mut cfg = ctest::TestGenerator::new();
 
-    if cfg!(feature = "native") {
-        cfg.cfg("feature", Some("native"));
-    }
+    let includedir = env::var_os("DEP_UNWIND_INCLUDEDIR").unwrap();
+    cfg.include(includedir);
+
     if cfg!(feature = "ptrace") {
         cfg.cfg("feature", Some("ptrace"))
-            .cfg("feature", Some("native"))
             .header("libunwind-ptrace.h");
     }
 

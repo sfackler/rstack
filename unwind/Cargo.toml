@@ -10,4 +10,4 @@ ptrace = ["unwind-sys/ptrace"]
 libc = "0.2"
 foreign-types = "0.3"
 
-unwind-sys = { path = "../unwind-sys", features = ["native"] }
+unwind-sys = { path = "../unwind-sys" }

@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
 
 [features]
-native = ["unwind-sys/native"]
 ptrace = ["unwind-sys/ptrace"]
 
 [dependencies]

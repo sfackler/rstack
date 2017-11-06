@@ -2,10 +2,10 @@
 name = "unwind-sys"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
+links = "unwind"
 
 [features]
-native = []
-ptrace = ["native"]
+ptrace = []
 
 [dependencies]
 libc = "0.2"

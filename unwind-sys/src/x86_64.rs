@@ -2,8 +2,6 @@ use libc::{c_char, c_int, c_void, size_t, ucontext_t};
 
 pub use ::*;
 
-make_api!();
-
 pub const UNW_TDEP_CURSOR_LEN: c_int = 127;
 
 pub type unw_word_t = u64;
@@ -37,6 +35,7 @@ pub const UNW_TDEP_EH: c_int = UNW_X86_64_RAX;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct unw_tdep_save_loc_t {
+    #[cfg(unwind12x)]
     pub unused: c_char,
 }
 
@@ -45,6 +44,7 @@ pub type unw_tdep_context_t = ucontext_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct unw_tdep_proc_info_t {
+    #[cfg(unwind12x)]
     pub unused: c_char,
 }
 

@@ -296,21 +296,25 @@ mod test {
                     let ip = cursor.register(RegNum::IP).unwrap();
                     let info = cursor.procedure_info().unwrap();
                     let mut offset = 0;
-                    match cursor.procedure_name(&mut buf, &mut offset) {
-                        Ok(()) => {}
-                        Err(Error::NOMEM) => {}
-                        Err(e) => panic!("{}", e),
-                    }
+                    let ok = match cursor.procedure_name(&mut buf, &mut offset) {
+                        Ok(()) => true,
+                        Err(Error::NOMEM) => true,
+                        Err(_) => false,
+                    };
 
-                    let len = buf.iter().position(|b| *b == 0).unwrap();
-                    let name = str::from_utf8(&buf[..len]).unwrap();
-                    println!(
-                        "{:#x} - {} ({:#x}) + {:#x}",
-                        ip,
-                        name,
-                        info.start_ip,
-                        offset
-                    );
+                    if ok {
+                        let len = buf.iter().position(|b| *b == 0).unwrap();
+                        let name = str::from_utf8(&buf[..len]).unwrap();
+                        println!(
+                            "{:#x} - {} ({:#x}) + {:#x}",
+                            ip,
+                            name,
+                            info.start_ip,
+                            offset
+                        );
+                    } else {
+                        println!("{:#x} - ????", ip);
+                    }
 
                     if !cursor.step().unwrap() {
                         break;
