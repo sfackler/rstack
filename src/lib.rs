@@ -74,8 +74,8 @@ impl Thread {
 
 pub struct Frame {
     ip: usize,
-    name: Option<ProcedureName>,
-    info: Option<ProcedureInfo>,
+    name: unwind::Result<ProcedureName>,
+    info: unwind::Result<ProcedureInfo>,
 }
 
 impl Frame {
@@ -83,12 +83,18 @@ impl Frame {
         self.ip
     }
 
-    pub fn name(&self) -> Option<&ProcedureName> {
-        self.name.as_ref()
+    pub fn name(&self) -> unwind::Result<&ProcedureName> {
+        match self.name {
+            Ok(ref name) => Ok(name),
+            Err(e) => Err(e),
+        }
     }
 
-    pub fn info(&self) -> Option<&ProcedureInfo> {
-        self.info.as_ref()
+    pub fn info(&self) -> unwind::Result<&ProcedureInfo> {
+        match self.info {
+            Ok(ref name) => Ok(name),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -270,55 +276,45 @@ impl TracedThread {
 
         let mut trace = vec![];
         loop {
-            let mut frame = Frame {
-                ip: cursor.register(RegNum::IP)? as usize,
-                name: None,
-                info: None,
-            };
+            let ip = cursor.register(RegNum::IP)? as usize;
 
             let mut buf = vec![0; 256];
-            loop {
+            let name = loop {
                 let mut offset = 0;
                 match cursor.procedure_name(&mut buf, &mut offset) {
                     Ok(()) => {
                         let end = buf.iter().position(|b| *b == 0).unwrap();
                         buf.truncate(end);
-                        frame.name = Some(ProcedureName {
+                        break Ok(ProcedureName {
                             name: String::from_utf8(buf).unwrap(),
                             offset: offset as usize,
                         });
-                        break;
                     }
                     Err(unwind::Error::NOMEM) => {
                         let len = buf.len() * 2;
                         buf.resize(len, 0);
                     }
                     Err(e) => {
-                        debug!(
-                            "error retrieving procedure name for thread {}: {}",
-                            self.0,
-                            e
-                        );
-                        break;
+                        break Err(e);
                     }
                 }
-            }
+            };
 
-            match cursor.procedure_info() {
+            let info = match cursor.procedure_info() {
                 Ok(info) => {
-                    frame.info = Some(ProcedureInfo {
+                    Ok(ProcedureInfo {
                         start_ip: info.start_ip as usize,
                         end_ip: info.end_ip as usize,
-                    });
+                    })
                 }
-                Err(e) => debug!(
-                    "error retreiving procedure info for thread {}: {}",
-                    self.0,
-                    e
-                ),
-            }
+                Err(e) => Err(e)
+            };
 
-            trace.push(frame);
+            trace.push(Frame {
+                ip,
+                name,
+                info,
+            });
 
             match cursor.step() {
                 Ok(true) => {}

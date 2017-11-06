@@ -30,7 +30,7 @@ fn main() {
         println!("thread {} - {}", thread.id(), thread.name());
         for frame in thread.trace() {
             match (frame.name(), frame.info()) {
-                (Some(name), Some(info)) if frame.ip() - name.offset() == info.start_ip() => {
+                (Ok(name), Ok(info)) if frame.ip() - name.offset() == info.start_ip() => {
                     println!("{:#016x} - {} + {:#x}", frame.ip(), name.name(), name.offset(),)
                 }
                 _ => println!("{:#016x} - ???", frame.ip()),
