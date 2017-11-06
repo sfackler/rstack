@@ -1,3 +1,4 @@
+//! An interface to the libunwind library.
 extern crate libc;
 extern crate unwind_sys;
 
@@ -15,21 +16,42 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use unwind_sys::*;
 
+/// The result type returned by functions in this crate.
 pub type Result<T> = result::Result<T, Error>;
 
+/// An error returned from libunwind.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Error(c_int);
 
 impl Error {
+    /// An unspecified error.
     pub const UNSPEC: Error = Error(-UNW_EUNSPEC);
+
+    /// Out of memory.
     pub const NOMEM: Error = Error(-UNW_ENOMEM);
+
+    /// Bad register number.
     pub const BADREG: Error = Error(-UNW_EBADREG);
+
+    /// Attempt to write read-only register.
     pub const READONLYREG: Error = Error(-UNW_EREADONLYREG);
+
+    /// Stop unwinding.
     pub const STOPUNWIND: Error = Error(-UNW_ESTOPUNWIND);
+
+    /// Invalid IP.
     pub const INVALIDIP: Error = Error(-UNW_EINVALIDIP);
+
+    /// Bad frame.
     pub const BADFRAME: Error = Error(-UNW_EBADFRAME);
+
+    /// Unsupported operation or bad value.
     pub const INVAL: Error = Error(-UNW_EINVAL);
+
+    /// Unwind info has unsupported value.
     pub const BADVERSION: Error = Error(-UNW_EBADVERSION);
+
+    /// No unwind info found.
     pub const NOINFO: Error = Error(-UNW_ENOINFO);
 }
 
@@ -58,6 +80,7 @@ impl error::Error for Error {
     }
 }
 
+/// The byteorder of an address space.
 #[derive(Copy, Clone)]
 pub struct Byteorder(c_int);
 
@@ -73,14 +96,6 @@ impl Byteorder {
 
     /// PDP endian.
     pub const PDP_ENDIAN: Byteorder = Byteorder(3412);
-
-    /// The endianness of the target architecture.
-    pub const NATIVE_ENDIAN: Byteorder = Byteorder::_NATIVE_ENDIAN;
-
-    #[cfg(target_endian = "little")]
-    const _NATIVE_ENDIAN: Byteorder = Byteorder::LITTLE_ENDIAN;
-    #[cfg(target_endian = "big")]
-    const _NATIVE_ENDIAN: Byteorder = Byteorder::BIG_ENDIAN;
 }
 
 #[cfg(feature = "ptrace")]
@@ -88,13 +103,22 @@ foreign_type! {
     type CType = c_void;
     fn drop = _UPT_destroy;
 
+    /// The unwind state used by the ptrace accessors.
+    ///
+    /// The `ptrace` Cargo feature must be enabled to use this type.
     pub struct PTraceState;
 
+    /// A borrowed reference to a [`PTraceState`].
+    ///
+    /// [`PTraceState`]: struct.PTraceState.html
     pub struct PTraceStateRef;
 }
 
 #[cfg(feature = "ptrace")]
 impl PTraceState {
+    /// Constructs a new `PTraceState` for the specified PID.
+    ///
+    /// The process must already be attached and suspended before unwinding can be performed.
     pub fn new(pid: u32) -> Result<PTraceState> {
         unsafe {
             let ptr = _UPT_create(pid as _);
@@ -108,15 +132,20 @@ impl PTraceState {
     }
 }
 
+/// A collection of functions used to unwind an arbitrary process.
 pub struct Accessors<T>(unw_accessors_t, PhantomData<T>);
 
 #[cfg(feature = "ptrace")]
 impl Accessors<PTraceStateRef> {
+    /// Returns `Accessors` which use the ptrace system call to unwind a remote process.
+    ///
+    /// THe `ptrace` Cargo feature must be enabled to use this type.
     pub fn ptrace() -> &'static Accessors<PTraceStateRef> {
         unsafe { &*(&_UPT_accessors as *const unw_accessors_t as *const Accessors<PTraceStateRef>) }
     }
 }
 
+/// An address space upon which unwinding can be performed.
 pub struct AddressSpace<T>(unw_addr_space_t, PhantomData<T>);
 
 impl<T> Drop for AddressSpace<T> {
@@ -142,6 +171,7 @@ impl<T> DerefMut for AddressSpace<T> {
 }
 
 impl<T> AddressSpace<T> {
+    /// Creates a new `AddressSpace`.
     pub fn new(accessors: &Accessors<T>, byteorder: Byteorder) -> Result<AddressSpace<T>> {
         unsafe {
             let ptr = unw_create_addr_space(
@@ -157,6 +187,9 @@ impl<T> AddressSpace<T> {
     }
 }
 
+/// A borrowed reference to an [`AddressSpace`].
+///
+/// [`AddressSpace`]: struct.AddressSpace.html
 pub struct AddressSpaceRef<T>(Opaque, PhantomData<T>);
 
 impl<T> AddressSpaceRef<T> {
@@ -165,25 +198,42 @@ impl<T> AddressSpaceRef<T> {
     }
 }
 
+/// An identifier of a processor register.
 #[derive(Copy, Clone)]
 pub struct RegNum(c_int);
 
 impl RegNum {
+    /// A generic identifier for the register storing the instruction pointer.
     pub const IP: RegNum = RegNum(UNW_REG_IP);
+
+    /// A generic identifier for the register storing the stack pointer.
     pub const SP: RegNum = RegNum(UNW_REG_SP);
 }
 
+/// Information about a procedure.
 #[derive(Copy, Clone)]
 pub struct ProcedureInfo {
+    /// The starting address of the procedure.
     pub start_ip: u64,
+
+    /// The ending address of the procedure.
     pub end_ip: u64,
     _p: (),
 }
 
+/// A cursor into a frame of a stack.
+///
+/// The cursor starts at the current (topmost) frame, and can be advanced downwards through the
+/// stack. While a cursor cannot be run "backwards", it can be cloned, and one of the copies
+/// advanced while the other continues to refer to the previous frame.
 #[derive(Clone)]
 pub struct Cursor<'a>(unw_cursor_t, PhantomData<(&'a ())>);
 
 impl<'a> Cursor<'a> {
+    /// Creates a cursor over the stack of the calling thread.
+    ///
+    /// The cursor is provided to a closure rather than being returned because the stack frame being
+    /// referenced by the frame must remain alive.
     pub fn local<F, T>(f: F) -> Result<T>
     where
         F: FnOnce(Cursor) -> Result<T>,
@@ -205,6 +255,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Creates a cursor over the stack of a "remote" process.
     pub fn remote<T>(address_space: &'a AddressSpaceRef<T>, state: &'a T) -> Result<Cursor<'a>> {
         unsafe {
             let mut cursor = mem::uninitialized();
@@ -221,6 +272,9 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Steps the cursor into the next older stack frame.
+    ///
+    /// A return value of `false` indicates that the cursor is at the last frame of the stack.
     pub fn step(&mut self) -> Result<bool> {
         unsafe {
             let ret = unw_step(&mut self.0);
@@ -234,6 +288,9 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Returns the value of an integral register at the current frame.
+    ///
+    /// Based on the calling convention, some registers may not be available in a stack frame.
     pub fn register(&self, num: RegNum) -> Result<u64> {
         unsafe {
             let mut val = 0;
@@ -246,6 +303,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Returns information about the procedure at the current frame.
     pub fn procedure_info(&self) -> Result<ProcedureInfo> {
         unsafe {
             let mut info = mem::uninitialized();
@@ -262,6 +320,21 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Returns the name of the procedure of the current frame.
+    ///
+    /// The name is copied into the provided buffer, and is null-terminated. If the buffer is too
+    /// small to hold the full name, [`Error::NOMEM`] is returned, and the buffer contains the
+    /// portion of the name that fits (including the null terminator).
+    ///
+    /// The offset of the instruction pointer from the beginning of the identified procedure is
+    /// copied into the `offset` parameter.
+    ///
+    /// In certain contexts, particularly when the binary being unwound has been stripped, the
+    /// unwinder may not have enough information to properly identify the procedure and will simply
+    /// return the first label before the frame's instruction pointer. The offset will always be
+    /// relative to this label.
+    ///
+    /// [`Error::NOMEM`]: struct.Error.html#associatedconstant.NOMEM
     pub fn procedure_name(&self, buf: &mut [u8], offset: &mut u64) -> Result<()> {
         unsafe {
             let mut raw_off = 0;
@@ -369,21 +442,25 @@ mod test {
             let ip = cursor.register(RegNum::IP).unwrap();
             let info = cursor.procedure_info().unwrap();
             let mut offset = 0;
-            match cursor.procedure_name(&mut buf, &mut offset) {
-                Ok(()) => {}
-                Err(Error::NOMEM) => {}
-                Err(e) => panic!("{}", e),
-            }
+            let ok = match cursor.procedure_name(&mut buf, &mut offset) {
+                Ok(()) => true,
+                Err(Error::NOMEM) => true,
+                Err(_) => false,
+            };
 
-            let len = buf.iter().position(|b| *b == 0).unwrap();
-            let name = str::from_utf8(&buf[..len]).unwrap();
-            println!(
-                "{:#x} - {} ({:#x}) + {:#x}",
-                ip,
-                name,
-                info.start_ip,
-                offset
-            );
+            if ok {
+                let len = buf.iter().position(|b| *b == 0).unwrap();
+                let name = str::from_utf8(&buf[..len]).unwrap();
+                println!(
+                    "{:#x} - {} ({:#x}) + {:#x}",
+                    ip,
+                    name,
+                    info.start_ip,
+                    offset
+                );
+            } else {
+                println!("{:#x} - ????", ip);
+            }
 
             if !cursor.step().unwrap() {
                 break;
