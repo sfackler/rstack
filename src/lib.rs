@@ -59,14 +59,17 @@ pub struct Thread {
 }
 
 impl Thread {
+    #[inline]
     pub fn id(&self) -> u32 {
         self.id
     }
 
+    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[inline]
     pub fn trace(&self) -> &[Frame] {
         &self.trace
     }
@@ -79,21 +82,24 @@ pub struct Frame {
 }
 
 impl Frame {
+    #[inline]
     pub fn ip(&self) -> usize {
         self.ip
     }
 
-    pub fn name(&self) -> unwind::Result<&ProcedureName> {
+    #[inline]
+    pub fn name(&self) -> Result<&ProcedureName> {
         match self.name {
             Ok(ref name) => Ok(name),
-            Err(e) => Err(e),
+            Err(e) => Err(Error(ErrorInner::Unwind(e))),
         }
     }
 
-    pub fn info(&self) -> unwind::Result<&ProcedureInfo> {
+    #[inline]
+    pub fn info(&self) -> Result<&ProcedureInfo> {
         match self.info {
             Ok(ref name) => Ok(name),
-            Err(e) => Err(e),
+            Err(e) => Err(Error(ErrorInner::Unwind(e))),
         }
     }
 }
@@ -104,10 +110,12 @@ pub struct ProcedureName {
 }
 
 impl ProcedureName {
+    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[inline]
     pub fn offset(&self) -> usize {
         self.offset
     }
@@ -119,10 +127,12 @@ pub struct ProcedureInfo {
 }
 
 impl ProcedureInfo {
+    #[inline]
     pub fn start_ip(&self) -> usize {
         self.start_ip
     }
 
+    #[inline]
     pub fn end_ip(&self) -> usize {
         self.end_ip
     }
@@ -277,52 +287,22 @@ impl TracedThread {
         let mut trace = vec![];
         loop {
             let ip = cursor.register(RegNum::IP)? as usize;
-
-            let mut buf = vec![0; 256];
-            let name = loop {
-                let mut offset = 0;
-                match cursor.procedure_name(&mut buf, &mut offset) {
-                    Ok(()) => {
-                        let end = buf.iter().position(|b| *b == 0).unwrap();
-                        buf.truncate(end);
-                        break Ok(ProcedureName {
-                            name: String::from_utf8(buf).unwrap(),
-                            offset: offset as usize,
-                        });
-                    }
-                    Err(unwind::Error::NOMEM) => {
-                        let len = buf.len() * 2;
-                        buf.resize(len, 0);
-                    }
-                    Err(e) => {
-                        break Err(e);
-                    }
+            let name = cursor.procedure_name().map(|n| {
+                ProcedureName {
+                    name: n.name,
+                    offset: n.offset as usize,
                 }
-            };
-
-            let info = match cursor.procedure_info() {
-                Ok(info) => {
-                    Ok(ProcedureInfo {
-                        start_ip: info.start_ip as usize,
-                        end_ip: info.end_ip as usize,
-                    })
-                }
-                Err(e) => Err(e)
-            };
-
-            trace.push(Frame {
-                ip,
-                name,
-                info,
             });
-
-            match cursor.step() {
-                Ok(true) => {}
-                Ok(false) => break,
-                Err(e) => {
-                    debug!("error stepping frame for thread {}: {}", self.0, e);
-                    break;
+            let info = cursor.procedure_info().map(|i| {
+                ProcedureInfo {
+                    start_ip: i.start_ip as usize,
+                    end_ip: i.end_ip as usize,
                 }
+            });
+            trace.push(Frame { ip, name, info });
+
+            if !cursor.step()? {
+                break;
             }
         }
 
