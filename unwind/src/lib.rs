@@ -327,6 +327,12 @@ impl<'a> Cursor<'a> {
     /// A return value of `false` indicates that the cursor is at the last frame of the stack.
     pub fn step(&mut self) -> Result<bool> {
         unsafe {
+            // libunwind 1.1 seems to get confused and walks off the end of the stack. The last IP
+            // it reports is 0, so we'll stop if we're there.
+            if cfg!(pre12) && self.register(RegNum::IP).unwrap_or(1) == 0 {
+                return Ok(false);
+            }
+
             let ret = unw_step(&mut self.0);
             if ret > 0 {
                 Ok(true)
