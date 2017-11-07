@@ -24,8 +24,8 @@ job: &JOB
     RUSTFLAGS: -D warnings
   steps:
     - checkout
-    - apt-get update
-    - apt-get install -y libunwind-dev
+    - run: apt-get update
+    - run: apt-get install -y libunwind-dev
     - *RESTORE_REGISTRY
     - run: cargo generate-lockfile
     - *SAVE_REGISTRY
