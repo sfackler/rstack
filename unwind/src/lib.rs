@@ -1,4 +1,43 @@
-//! An interface to the libunwind library.
+//! An interface to [libunwind].
+//!
+//! libunwind provides access to the call chain of a process. It supports both local and remote
+//! processes.
+//!
+//! # Examples
+//!
+//! Printing a backtrace of the current thread:
+//!
+//! ```
+//! use unwind::{Cursor, RegNum};
+//!
+//! Cursor::local(|mut cursor| {
+//!     loop {
+//!         let ip = cursor.register(RegNum::IP)?;
+//!
+//!         match (cursor.procedure_info(), cursor.procedure_name()) {
+//!             (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
+//!                 println!(
+//!                     "{:#016x} - {} ({:#016x}) + {:#x}",
+//!                     ip,
+//!                     name.name,
+//!                     info.start_ip,
+//!                     name.offset
+//!                 );
+//!             }
+//!             _ => println!("{:#016x} - ????", ip),
+//!         }
+//!
+//!         if !cursor.step()? {
+//!             break;
+//!         }
+//!     }
+//!
+//!     Ok(())
+//! }).unwrap();
+//! ```
+//!
+//! [libunwind]: http://www.nongnu.org/libunwind/
+#![warn(missing_docs)]
 extern crate libc;
 extern crate unwind_sys;
 
@@ -24,7 +63,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub struct Error(c_int);
 
 impl Error {
-    /// An unspecified error.
+    /// Unspecified error.
     pub const UNSPEC: Error = Error(-UNW_EUNSPEC);
 
     /// Out of memory.
@@ -221,6 +260,17 @@ pub struct ProcedureInfo {
     _p: (),
 }
 
+/// The name of a procedure.
+#[derive(Clone)]
+pub struct ProcedureName {
+    /// The name of the procedure.
+    pub name: String,
+
+    /// The offset of the frame's instruction pointer from the named procedure.
+    pub offset: u64,
+    _p: (),
+}
+
 /// A cursor into a frame of a stack.
 ///
 /// The cursor starts at the current (topmost) frame, and can be advanced downwards through the
@@ -329,13 +379,15 @@ impl<'a> Cursor<'a> {
     /// The offset of the instruction pointer from the beginning of the identified procedure is
     /// copied into the `offset` parameter.
     ///
+    /// The `procedure_name` method provides a higher level wrapper over this method.
+    ///
     /// In certain contexts, particularly when the binary being unwound has been stripped, the
     /// unwinder may not have enough information to properly identify the procedure and will simply
     /// return the first label before the frame's instruction pointer. The offset will always be
     /// relative to this label.
     ///
     /// [`Error::NOMEM`]: struct.Error.html#associatedconstant.NOMEM
-    pub fn procedure_name(&self, buf: &mut [u8], offset: &mut u64) -> Result<()> {
+    pub fn procedure_name_raw(&self, buf: &mut [u8], offset: &mut u64) -> Result<()> {
         unsafe {
             let mut raw_off = 0;
             let ret = unw_get_proc_name(
@@ -352,6 +404,36 @@ impl<'a> Cursor<'a> {
             }
         }
     }
+
+    /// Returns the name of the procedure of the current frame.
+    ///
+    /// In certain contexts, particularly when the binary being unwound has been stripped, the
+    /// unwinder may not have enough information to properly identify the procedure and will simply
+    /// return the first label before the frame's instruction pointer. The offset will always be
+    /// relative to this label.
+    pub fn procedure_name(&self) -> Result<ProcedureName> {
+        let mut buf = vec![0; 256];
+        loop {
+            let mut offset = 0;
+            match self.procedure_name_raw(&mut buf, &mut offset) {
+                Ok(()) => {
+                    let len = buf.iter().position(|b| *b == 0).unwrap();
+                    buf.truncate(len);
+                    let name = String::from_utf8(buf).unwrap();
+                    return Ok(ProcedureName {
+                        name,
+                        offset: offset as u64,
+                        _p: (),
+                    });
+                }
+                Err(Error::NOMEM) => {
+                    let len = buf.len() * 2;
+                    buf.resize(len, 0);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -364,29 +446,22 @@ mod test {
     fn local() {
         fn bar() {
             Cursor::local(|mut cursor| {
-                let mut buf = [0; 256];
                 loop {
                     let ip = cursor.register(RegNum::IP).unwrap();
-                    let info = cursor.procedure_info().unwrap();
-                    let mut offset = 0;
-                    let ok = match cursor.procedure_name(&mut buf, &mut offset) {
-                        Ok(()) => true,
-                        Err(Error::NOMEM) => true,
-                        Err(_) => false,
-                    };
 
-                    if ok {
-                        let len = buf.iter().position(|b| *b == 0).unwrap();
-                        let name = str::from_utf8(&buf[..len]).unwrap();
-                        println!(
-                            "{:#x} - {} ({:#x}) + {:#x}",
-                            ip,
-                            name,
-                            info.start_ip,
-                            offset
-                        );
-                    } else {
-                        println!("{:#x} - ????", ip);
+                    match (cursor.procedure_info(), cursor.procedure_name()) {
+                        (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
+                            println!(
+                                "{:#016x} - {} ({:#016x}) + {:#x}",
+                                ip,
+                                name.name,
+                                info.start_ip,
+                                name.offset
+                            );
+                        }
+                        _ => {
+                            println!("{:#016x} - ????", ip);
+                        }
                     }
 
                     if !cursor.step().unwrap() {
@@ -437,29 +512,20 @@ mod test {
         let address_space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT).unwrap();
         let mut cursor = Cursor::remote(&address_space, &state).unwrap();
 
-        let mut buf = [0; 256];
         loop {
             let ip = cursor.register(RegNum::IP).unwrap();
-            let info = cursor.procedure_info().unwrap();
-            let mut offset = 0;
-            let ok = match cursor.procedure_name(&mut buf, &mut offset) {
-                Ok(()) => true,
-                Err(Error::NOMEM) => true,
-                Err(_) => false,
-            };
 
-            if ok {
-                let len = buf.iter().position(|b| *b == 0).unwrap();
-                let name = str::from_utf8(&buf[..len]).unwrap();
-                println!(
-                    "{:#x} - {} ({:#x}) + {:#x}",
-                    ip,
-                    name,
-                    info.start_ip,
-                    offset
-                );
-            } else {
-                println!("{:#x} - ????", ip);
+            match (cursor.procedure_info(), cursor.procedure_name()) {
+                (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
+                    println!(
+                        "{:#016x} - {} ({:#016x}) + {:#x}",
+                        ip,
+                        name.name,
+                        info.start_ip,
+                        name.offset
+                    );
+                }
+                _ => println!("{:#016x} - ????", ip),
             }
 
             if !cursor.step().unwrap() {
