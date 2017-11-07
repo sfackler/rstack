@@ -444,8 +444,6 @@ impl<'a> Cursor<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::str;
-
     use super::*;
 
     #[test]
