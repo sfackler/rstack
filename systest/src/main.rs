@@ -1,7 +1,7 @@
-#![allow(bad_style)]
+#![allow(bad_style, improper_ctypes)] // x86_64 libunwind has empty structs before 1.2
 
-extern crate unwind_sys;
 extern crate libc;
+extern crate unwind_sys;
 
 use libc::*;
 use unwind_sys::*;

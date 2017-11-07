@@ -1,4 +1,3 @@
-#![allow(improper_ctypes)]
 use libc::{c_void, pid_t};
 
 use ::*;

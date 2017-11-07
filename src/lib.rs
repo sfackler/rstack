@@ -332,8 +332,8 @@ mod test {
             println!(
                 "{:#x} - {} + {:#x}",
                 frame.ip(),
-                frame.name().map_or("<unknown>", |s| s.name()),
-                frame.name().map_or(0, |s| s.offset())
+                frame.name().ok().map_or("<unknown>", |s| s.name()),
+                frame.name().ok().map_or(0, |s| s.offset())
             );
         }
 
