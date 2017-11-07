@@ -1,6 +1,6 @@
 use libc::{c_char, c_int, c_void, size_t, ucontext_t};
 
-pub use ::*;
+use ::*;
 
 pub const UNW_TDEP_CURSOR_LEN: c_int = 127;
 
