@@ -2,6 +2,11 @@
 name = "unwind"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
+description = "An interface to libunwind"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/sfackler/rstack"
+categories = ["api-bindings", "development-tools::debugging"]
+keywords = ["stack", "backtrace", "stacktrace"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -14,4 +19,4 @@ ptrace = ["unwind-sys/ptrace"]
 libc = "0.2"
 foreign-types = "0.3"
 
-unwind-sys = { path = "../unwind-sys" }
+unwind-sys = { version = "0.1.0", path = "../unwind-sys" }
