@@ -3,6 +3,10 @@ name = "unwind"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
 
+[package.metadata.docs.rs]
+all-features = true
+dependencies = ["libunwind-dev"]
+
 [features]
 ptrace = ["unwind-sys/ptrace"]
 

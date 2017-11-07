@@ -3,6 +3,9 @@ name = "rstack"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
 
+[package.metadata.docs.rs]
+dependencies = ["libunwind-dev"]
+
 [dependencies]
 libc = "0.2"
 log = "0.3"
