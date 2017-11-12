@@ -1,23 +1,7 @@
-[package]
-name = "rstack"
-version = "0.1.0"
-authors = ["Steven Fackler <sfackler@palantir.com>"]
-
-[package.metadata.docs.rs]
-dependencies = ["libunwind-dev"]
-
-[dependencies]
-libc = "0.2"
-log = "0.3"
-
-unwind = { path = "unwind", features = ["ptrace"] }
-
-[dev-dependencies]
-env_logger = "0.4"
-
 [workspace]
 members = [
     "systest",
+    "rstack",
     "unwind",
     "unwind-sys",
 ]
