@@ -10,16 +10,19 @@ use std::ffi::{CStr, OsStr};
 use std::fs::File;
 use std::os::unix::ffi::OsStrExt;
 use std::panic::{self, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::slice;
 
 lazy_static! {
     static ref STATE: State = load_state();
 }
 
-pub fn query(
-    addr: usize,
-) -> Result<IterFrames<'static, EndianBuf<'static, RunTimeEndian>>, gimli::Error> {
+pub struct FrameInfo {
+    pub library: Option<&'static Path>,
+    pub frames: Result<IterFrames<'static, EndianBuf<'static, RunTimeEndian>>, gimli::Error>,
+}
+
+pub fn query(addr: usize) -> Option<FrameInfo> {
     let state = &*STATE;
 
     let idx = match state.segments.binary_search_by(|s| {
@@ -32,19 +35,16 @@ pub fn query(
         }
     }) {
         Ok(idx) => idx,
-        Err(_) => {
-            warn!(
-                "unable to find address {:#016x} in known dynamic segments",
-                addr
-            );
-            0
-        }
+        Err(_) => return None,
     };
 
     let idx = state.segments[idx].dylib;
     let dylib = &state.dylibs[idx];
     let shifted = addr - dylib.offset;
-    dylib.context.query(shifted as u64)
+    Some(FrameInfo {
+        library: dylib.name.as_ref().map(|p| &**p),
+        frames: dylib.context.query(shifted as u64),
+    })
 }
 
 struct CallbackState {
@@ -85,7 +85,7 @@ fn load_state() -> State {
 
 struct Dylib {
     name: Option<PathBuf>,
-    map: Mmap,
+    _map: Mmap,
     object: Box<object::File<'static>>,
     context: FullContext<EndianBuf<'static, RunTimeEndian>>,
     offset: usize,
@@ -120,7 +120,7 @@ impl State {
         let map = match file.and_then(|f| Mmap::map(&f)) {
             Ok(map) => map,
             Err(e) => {
-                warn!("error mapping file {:?}: {}", name, e);
+                debug!("error mapping file {:?}: {}", name, e);
                 return;
             }
         };
@@ -130,7 +130,7 @@ impl State {
         let object = match object::File::parse(&static_slice) {
             Ok(object) => Box::new(object),
             Err(e) => {
-                warn!("error parsing object file {:?}: {}", name, e);
+                debug!("error parsing object file {:?}: {}", name, e);
                 return;
             }
         };
@@ -140,7 +140,7 @@ impl State {
         let context = match Context::new(static_object).and_then(|c| c.parse_functions()) {
             Ok(context) => context,
             Err(e) => {
-                warn!("error loading debug info for {:?}: {}", name, e);
+                debug!("error loading debug info for {:?}: {}", name, e);
                 return;
             }
         };
@@ -150,7 +150,7 @@ impl State {
         let dylib = self.dylibs.len();
         self.dylibs.push(Dylib {
             name,
-            map,
+            _map: map,
             object,
             context,
             offset,
@@ -172,13 +172,13 @@ impl State {
 #[cfg(test)]
 mod test {
     use env_logger;
-    use fallible_iterator::FallibleIterator;
-    use unwind::{Cursor, RegNum};
 
     use super::*;
 
     #[test]
     fn load() {
+        let _ = env_logger::init();
+
         let state = &*STATE;
 
         for (i, dylib) in state.dylibs.iter().enumerate() {
@@ -195,33 +195,5 @@ mod test {
                 segment.dylib
             );
         }
-    }
-
-    #[test]
-    fn local() {
-        let _ = env_logger::init();
-
-        Cursor::local(|mut cursor| {
-            loop {
-                let ip = cursor.register(RegNum::IP)?;
-                println!("{:#016x} - {}", ip, cursor.procedure_name()?.name);
-
-                let mut it = query(ip as usize).unwrap();
-                while let Some(frame) = it.next().unwrap() {
-                    println!(
-                        "{}, {:?}, {:?}",
-                        frame.function.map_or("??".to_string(), |f| f.to_string()),
-                        frame.location.as_ref().map(|l| &l.file),
-                        frame.location.as_ref().map(|l| &l.line)
-                    );
-                }
-
-                if !cursor.step()? {
-                    break;
-                }
-            }
-
-            Ok(())
-        }).unwrap();
     }
 }

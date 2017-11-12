@@ -28,8 +28,19 @@ fn main() {
     for thread in trace {
         println!("{} - {}", thread.id, thread.name);
         for frame in thread.frames {
-            let name = frame.name.unwrap_or("???".to_string());
-            println!("{:#016x} - {}", frame.ip, name);
+            print!("{:#016x}", frame.ip);
+            if let Some(path) = frame.library {
+                print!(" ({})", path.display());
+            }
+            println!();
+
+            for symbol in frame.symbols {
+                print!("    - {}", symbol.name.unwrap_or("????".to_string()));
+                if let Some(file) = symbol.file {
+                    print!(" {}:{}", file.display(), symbol.line.unwrap_or(0));
+                }
+                println!();
+            }
         }
         println!();
     }

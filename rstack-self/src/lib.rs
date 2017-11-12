@@ -16,14 +16,12 @@ extern crate serde_derive;
 
 #[cfg(test)]
 extern crate env_logger;
-#[cfg(test)]
-extern crate unwind;
 
 use fallible_iterator::FallibleIterator;
 use libc::{c_ulong, getppid, prctl, PR_SET_PTRACER};
 use std::process::{Command, Stdio};
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io::{self, Read, Write};
 
 mod dylibs;
@@ -36,6 +34,11 @@ pub struct Thread {
 
 pub struct Frame {
     pub ip: usize,
+    pub library: Option<&'static Path>,
+    pub symbols: Vec<Symbol>,
+}
+
+pub struct Symbol {
     pub name: Option<String>,
     pub file: Option<PathBuf>,
     pub line: Option<u64>,
@@ -103,40 +106,46 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
     };
 
     for raw_frame in raw.frames {
+        let mut frame = Frame {
+            ip: raw_frame.ip,
+            library: None,
+            symbols: vec![],
+        };
+
         let current_ip = if raw_frame.is_signal {
             raw_frame.ip
         } else {
             raw_frame.ip - 1
         };
-        let mut it = dylibs::query(current_ip)?;
-        let mut any = false;
-        while let Some(frame) = it.next()? {
-            any = true;
-            let mut full = Frame {
-                ip: raw_frame.ip,
-                name: None,
-                file: None,
-                line: None,
-            };
-            if let Some(function) = frame.function {
-                full.name = Some(function.to_string());
-            }
-            if let Some(location) = frame.location {
-                full.file = location.file;
-                full.line = location.line;
-            }
+        if let Some(info) = dylibs::query(current_ip) {
+            frame.library = info.library;
 
-            thread.frames.push(full);
-        }
+            let symbols = info.frames.and_then(|it| {
+                it.map(|raw_symbol| {
+                    let mut symbol = Symbol {
+                        name: None,
+                        file: None,
+                        line: None,
+                    };
+                    if let Some(function) = raw_symbol.function {
+                        symbol.name = Some(function.to_string());
+                    }
+                    if let Some(location) = raw_symbol.location {
+                        symbol.file = location.file;
+                        symbol.line = location.line;
+                    }
 
-        if !any {
-            thread.frames.push(Frame {
-                ip: raw_frame.ip,
-                name: None,
-                file: None,
-                line: None,
+                    symbol
+                }).collect()
             });
+
+            match symbols {
+                Ok(symbols) => frame.symbols = symbols,
+                Err(e) => debug!("error querying debug info for {:#016}: {}", current_ip, e),
+            }
         }
+
+        thread.frames.push(frame);
     }
 
     Ok(thread)

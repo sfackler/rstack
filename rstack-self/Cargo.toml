@@ -20,4 +20,3 @@ rstack = { path = "../rstack" }
 
 [dev-dependencies]
 env_logger = "0.4"
-unwind = { path = "../unwind" }
