@@ -440,6 +440,22 @@ impl<'a> Cursor<'a> {
             }
         }
     }
+
+    /// Determines if the current frame is a signal frame.
+    ///
+    /// Signal frames are unique in several ways. More register state is available than normal, and
+    /// the instruction pointer references the currently executing instruction rather than the next
+    /// instruction.
+    pub fn is_signal_frame(&self) -> Result<bool> {
+        unsafe {
+            let ret = unw_is_signal_frame(&self.0 as *const _ as *mut _);
+            if ret < 0 {
+                Err(Error(ret))
+            } else {
+                Ok(ret != 0)
+            }
+        }
+    }
 }
 
 #[cfg(test)]

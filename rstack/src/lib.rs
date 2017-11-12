@@ -77,6 +77,7 @@ impl Thread {
 
 pub struct Frame {
     ip: usize,
+    is_signal: unwind::Result<bool>,
     name: unwind::Result<ProcedureName>,
     info: unwind::Result<ProcedureInfo>,
 }
@@ -85,6 +86,14 @@ impl Frame {
     #[inline]
     pub fn ip(&self) -> usize {
         self.ip
+    }
+
+    #[inline]
+    pub fn is_signal(&self) -> Result<bool> {
+        match self.is_signal {
+            Ok(is_signal) => Ok(is_signal),
+            Err(e) => Err(Error(ErrorInner::Unwind(e))),
+        }
     }
 
     #[inline]
@@ -287,6 +296,7 @@ impl TracedThread {
         let mut trace = vec![];
         loop {
             let ip = cursor.register(RegNum::IP)? as usize;
+            let is_signal = cursor.is_signal_frame();
             let name = cursor.procedure_name().map(|n| {
                 ProcedureName {
                     name: n.name,
@@ -299,7 +309,12 @@ impl TracedThread {
                     end_ip: i.end_ip as usize,
                 }
             });
-            trace.push(Frame { ip, name, info });
+            trace.push(Frame {
+                ip,
+                is_signal,
+                name,
+                info,
+            });
 
             if !cursor.step()? {
                 break;

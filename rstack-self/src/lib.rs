@@ -102,13 +102,18 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
         frames: vec![],
     };
 
-    for ip in raw.frames {
-        let mut it = dylibs::query(ip)?;
+    for raw_frame in raw.frames {
+        let current_ip = if raw_frame.is_signal {
+            raw_frame.ip
+        } else {
+            raw_frame.ip - 1
+        };
+        let mut it = dylibs::query(current_ip)?;
         let mut any = false;
         while let Some(frame) = it.next()? {
             any = true;
             let mut full = Frame {
-                ip,
+                ip: raw_frame.ip,
                 name: None,
                 file: None,
                 line: None,
@@ -126,7 +131,7 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
 
         if !any {
             thread.frames.push(Frame {
-                ip,
+                ip: raw_frame.ip,
                 name: None,
                 file: None,
                 line: None,
@@ -141,7 +146,13 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
 struct RawThread {
     id: u32,
     name: String,
-    frames: Vec<usize>,
+    frames: Vec<RawFrame>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct RawFrame {
+    ip: usize,
+    is_signal: bool,
 }
 
 pub fn child() {
@@ -167,7 +178,16 @@ fn child_trace() -> Result<Vec<RawThread>, String> {
                     RawThread {
                         id: thread.id(),
                         name: thread.name().to_string(),
-                        frames: thread.trace().iter().map(|f| f.ip()).collect(),
+                        frames: thread
+                            .trace()
+                            .iter()
+                            .map(|f| {
+                                RawFrame {
+                                    ip: f.ip(),
+                                    is_signal: f.is_signal().unwrap_or(false),
+                                }
+                            })
+                            .collect(),
                     }
                 })
                 .collect(),
