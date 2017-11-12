@@ -1,0 +1,23 @@
+[package]
+name = "rstack-self"
+version = "0.1.0"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+
+[dependencies]
+addr2line = { git = "https://github.com/gimli-rs/addr2line" }
+fallible-iterator = "0.1"
+gimli = "0.14"
+lazy_static = "0.2"
+libc = "0.2"
+log = "0.3"
+memmap = "0.6"
+object = "0.4"
+serde = "1.0"
+serde_derive = "1.0"
+bincode = "0.9"
+
+rstack = { path = "../rstack" }
+
+[dev-dependencies]
+env_logger = "0.4"
+unwind = { path = "../unwind" }

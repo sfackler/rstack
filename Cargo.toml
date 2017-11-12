@@ -2,6 +2,10 @@
 members = [
     "systest",
     "rstack",
+    "rstack-self",
     "unwind",
     "unwind-sys",
 ]
+
+[patch.crates-io]
+libc = { git = "https://github.com/rust-lang/libc" }
