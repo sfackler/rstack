@@ -425,7 +425,7 @@ impl<'a> Cursor<'a> {
                 Ok(()) => {
                     let len = buf.iter().position(|b| *b == 0).unwrap();
                     buf.truncate(len);
-                    let name = String::from_utf8(buf).unwrap();
+                    let name = String::from_utf8_lossy(&buf).into_owned();
                     return Ok(ProcedureName {
                         name,
                         offset: offset as u64,
