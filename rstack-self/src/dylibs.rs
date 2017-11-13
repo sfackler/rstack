@@ -1,8 +1,10 @@
 use addr2line::{Context, FullContext, IterFrames};
+use cpp_demangle;
 use gimli::{self, EndianBuf, RunTimeEndian};
 use libc::{c_int, c_void, dl_iterate_phdr, dl_phdr_info, size_t, PT_LOAD};
 use memmap::Mmap;
-use object;
+use object::{self, SymbolKind};
+use rustc_demangle;
 use std::any::Any;
 use std::cmp::Ordering;
 use std::env;
@@ -19,6 +21,7 @@ lazy_static! {
 
 pub struct FrameInfo {
     pub library: Option<&'static Path>,
+    pub symbol: Option<&'static str>,
     pub frames: Result<IterFrames<'static, EndianBuf<'static, RunTimeEndian>>, gimli::Error>,
 }
 
@@ -41,9 +44,24 @@ pub fn query(addr: usize) -> Option<FrameInfo> {
     let idx = state.segments[idx].dylib;
     let dylib = &state.dylibs[idx];
     let shifted = addr - dylib.offset;
+
+    let symbol = match dylib.symbols.binary_search_by(|s| {
+        if s.start > addr {
+            Ordering::Greater
+        } else if s.end <= addr {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }) {
+        Ok(idx) => Some(&*dylib.symbols[idx].name),
+        Err(_) => None,
+    };
+
     Some(FrameInfo {
         library: dylib.name.as_ref().map(|p| &**p),
         frames: dylib.context.query(shifted as u64),
+        symbol,
     })
 }
 
@@ -88,7 +106,14 @@ struct Dylib {
     _map: Mmap,
     object: Box<object::File<'static>>,
     context: FullContext<EndianBuf<'static, RunTimeEndian>>,
+    symbols: Vec<Symbol>,
     offset: usize,
+}
+
+struct Symbol {
+    name: String,
+    start: usize,
+    end: usize,
 }
 
 struct Segment {
@@ -147,6 +172,24 @@ impl State {
 
         let offset = info.dlpi_addr as usize;
 
+        let mut symbols = vec![];
+        for symbol in object.get_symbols() {
+            if symbol.kind() != SymbolKind::Text || symbol.address() == 0 || symbol.size() == 0 {
+                continue;
+            }
+
+            let name = match cpp_demangle::Symbol::new(symbol.name()) {
+                Ok(name) => name.to_string(),
+                Err(_) => String::from_utf8_lossy(symbol.name()).into_owned(),
+            };
+            let name = rustc_demangle::demangle(&name).to_string();
+            let start = offset + symbol.address() as usize;
+            let end = start + symbol.size() as usize;
+
+            symbols.push(Symbol { name, start, end });
+        }
+        symbols.sort_by_key(|s| s.start);
+
         let dylib = self.dylibs.len();
         self.dylibs.push(Dylib {
             name,
@@ -154,6 +197,7 @@ impl State {
             object,
             context,
             offset,
+            symbols,
         });
 
         let segments = slice::from_raw_parts(info.dlpi_phdr, info.dlpi_phnum as usize);

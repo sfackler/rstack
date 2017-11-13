@@ -9,3 +9,7 @@ members = [
 
 [patch.crates-io]
 libc = { git = "https://github.com/rust-lang/libc" }
+gimli = { git = "https://github.com/sfackler/gimli", branch = "object-bump" }
+
+[profile.release]
+debug = 1

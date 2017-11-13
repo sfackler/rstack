@@ -1,11 +1,13 @@
 extern crate addr2line;
 extern crate bincode;
+extern crate cpp_demangle;
 extern crate fallible_iterator;
 extern crate gimli;
 extern crate libc;
 extern crate memmap;
 extern crate object;
 extern crate rstack;
+extern crate rustc_demangle;
 
 #[macro_use]
 extern crate lazy_static;
@@ -22,7 +24,7 @@ use libc::{c_ulong, getppid, prctl, PR_SET_PTRACER};
 use std::process::{Command, Stdio};
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::io::{self, Read, Write};
+use std::io::{self, BufReader, Read, Write};
 
 mod dylibs;
 
@@ -52,13 +54,12 @@ pub fn trace_threads(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Syn
         .spawn()?;
 
     let mut stdin = child.stdin.take().unwrap();
-    let mut stdout = child.stdout.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
 
     set_ptracer(child.id())?;
     let mut bomb = PtracerBomb(true);
 
     stdin.write_all(&[0])?;
-    stdin.flush()?;
 
     let raw: Result<Vec<RawThread>, String> =
         bincode::deserialize_from(&mut stdout, bincode::Infinite)?;
@@ -68,7 +69,6 @@ pub fn trace_threads(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Syn
     bomb.0 = false;
 
     stdin.write_all(&[0])?;
-    stdin.flush()?;
 
     symbolicate(raw)
 }
@@ -141,7 +141,19 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
 
             match symbols {
                 Ok(symbols) => frame.symbols = symbols,
-                Err(e) => debug!("error querying debug info for {:#016}: {}", current_ip, e),
+                Err(e) => {
+                    debug!("error querying debug info for {:#016}: {}", current_ip, e);
+                }
+            }
+
+            if frame.symbols.is_empty() {
+                if let Some(name) = info.symbol {
+                    frame.symbols.push(Symbol {
+                        name: Some(name.to_string()),
+                        file: None,
+                        line: None,
+                    });
+                }
             }
         }
 
