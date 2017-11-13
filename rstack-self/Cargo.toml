@@ -5,6 +5,7 @@ authors = ["Steven Fackler <sfackler@gmail.com>"]
 
 [dependencies]
 addr2line = { git = "https://github.com/sfackler/addr2line", branch = "object-bump" }
+antidote = "1.0"
 fallible-iterator = "0.1"
 gimli = "0.14"
 lazy_static = "0.2"

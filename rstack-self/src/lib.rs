@@ -1,4 +1,5 @@
 extern crate addr2line;
+extern crate antidote;
 extern crate bincode;
 extern crate cpp_demangle;
 extern crate fallible_iterator;
@@ -19,6 +20,7 @@ extern crate serde_derive;
 #[cfg(test)]
 extern crate env_logger;
 
+use antidote::Mutex;
 use fallible_iterator::FallibleIterator;
 use libc::{c_ulong, getppid, prctl, PR_SET_PTRACER};
 use std::process::{Command, Stdio};
@@ -27,6 +29,10 @@ use std::path::{Path, PathBuf};
 use std::io::{self, BufReader, Read, Write};
 
 mod dylibs;
+
+lazy_static! {
+    static ref TRACE_LOCK: Mutex<()> = Mutex::new(());
+}
 
 pub struct Thread {
     pub id: u32,
@@ -47,6 +53,8 @@ pub struct Symbol {
 }
 
 pub fn trace_threads(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Sync + Send>> {
+    let _guard = TRACE_LOCK.lock();
+
     let mut child = child
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
