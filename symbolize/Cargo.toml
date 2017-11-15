@@ -1,0 +1,15 @@
+[package]
+name = "symbolize"
+version = "0.1.0"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+
+[dependencies]
+goblin = { version = "0.0.12", default-features = false, features = ["elf32", "elf64", "endian_fd"] }
+lazy_static = "0.2"
+memmap = "0.6"
+libc = "0.2"
+log = "0.3"
+rustc-demangle = "0.1"
+
+[dev-dependencies]
+env_logger = "0.4"

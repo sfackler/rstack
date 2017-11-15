@@ -3,6 +3,7 @@ members = [
     "systest",
     "rstack",
     "rstack-self",
+    "symbolize",
     "unwind",
     "unwind-sys",
 ]
