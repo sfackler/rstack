@@ -7,7 +7,7 @@ extern crate log;
 #[cfg(test)]
 extern crate env_logger;
 
-use libc::{c_void, pid_t, ptrace, waitpid, EPERM, PTRACE_DETACH, PTRACE_INTERRUPT, PTRACE_SEIZE,
+use libc::{c_void, pid_t, ptrace, waitpid, ESRCH, PTRACE_DETACH, PTRACE_INTERRUPT, PTRACE_SEIZE,
            WIFSTOPPED, __WALL};
 use std::borrow::Borrow;
 use std::result;
@@ -244,9 +244,8 @@ fn add_threads(threads: &mut BTreeSet<TracedThread>, dir: &str) -> Result<()> {
         if !threads.contains(&pid) {
             let thread = match TracedThread::new(pid) {
                 Ok(thread) => thread,
-                // some errors can legitimately happen since we're racing with the thread exiting
-                // but we do want to report permission errors
-                Err(e) => if e.raw_os_error() == Some(EPERM) {
+                // ESRCH just means the thread died in the middle of things, which is fine
+                Err(e) => if e.raw_os_error() != Some(ESRCH) {
                     return Err(Error(ErrorInner::Io(e)));
                 } else {
                     debug!("error attaching to thread {}: {}", pid, e);
