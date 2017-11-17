@@ -215,9 +215,9 @@ fn get_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
 
     let path = format!("/proc/{}/task", pid);
 
-    // new threads may be create while we're in the process of stopping them all, so loop a couple
-    // of times to converge
-    for _ in 0..4 {
+    // new threads may be created while we're in the process of stopping them all, so loop a couple
+    // of times to hopefully converge
+    for _ in 0..5 {
         let prev = threads.len();
         add_threads(&mut threads, &path)?;
         if prev == threads.len() {
