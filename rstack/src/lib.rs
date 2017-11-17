@@ -54,7 +54,7 @@ impl error::Error for Error {
 
 pub struct Thread {
     id: u32,
-    name: String,
+    name: Option<String>,
     trace: Vec<Frame>,
 }
 
@@ -65,8 +65,8 @@ impl Thread {
     }
 
     #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|s| &**s)
     }
 
     #[inline]
@@ -77,9 +77,9 @@ impl Thread {
 
 pub struct Frame {
     ip: usize,
-    is_signal: unwind::Result<bool>,
-    name: unwind::Result<ProcedureName>,
-    info: unwind::Result<ProcedureInfo>,
+    is_signal: Option<bool>,
+    name: Option<ProcedureName>,
+    info: Option<ProcedureInfo>,
 }
 
 impl Frame {
@@ -89,27 +89,18 @@ impl Frame {
     }
 
     #[inline]
-    pub fn is_signal(&self) -> Result<bool> {
-        match self.is_signal {
-            Ok(is_signal) => Ok(is_signal),
-            Err(e) => Err(Error(ErrorInner::Unwind(e))),
-        }
+    pub fn is_signal(&self) -> Option<bool> {
+        self.is_signal
     }
 
     #[inline]
-    pub fn name(&self) -> Result<&ProcedureName> {
-        match self.name {
-            Ok(ref name) => Ok(name),
-            Err(e) => Err(Error(ErrorInner::Unwind(e))),
-        }
+    pub fn name(&self) -> Option<&ProcedureName> {
+        self.name.as_ref()
     }
 
     #[inline]
-    pub fn info(&self) -> Result<&ProcedureInfo> {
-        match self.info {
-            Ok(ref name) => Ok(name),
-            Err(e) => Err(Error(ErrorInner::Unwind(e))),
-        }
+    pub fn info(&self) -> Option<&ProcedureInfo> {
+        self.info.as_ref()
     }
 }
 
@@ -147,32 +138,68 @@ impl ProcedureInfo {
     }
 }
 
-pub fn trace_threads(pid: u32) -> Result<Vec<Thread>> {
-    let space = AddressSpace::new(&Accessors::ptrace(), Byteorder::DEFAULT)
-        .map_err(|e| Error(ErrorInner::Unwind(e)))?;
-    let threads = get_threads(pid)?;
+pub struct TraceOptions {
+    thread_names: bool,
+    procedure_names: bool,
+    procedure_info: bool,
+}
 
-    let mut traces = vec![];
-
-    for thread in &threads {
-        let path = format!("/proc/{}/task/{}/comm", pid, thread.0);
-        let mut name = vec![];
-        if let Err(e) = File::open(path).and_then(|mut r| r.read_to_end(&mut name)) {
-            debug!("error getting name for thread {}: {}", thread.0, e);
-            continue;
-        }
-
-        match thread.dump(&space) {
-            Ok(trace) => traces.push(Thread {
-                id: thread.0,
-                name: String::from_utf8_lossy(&name).trim().to_string(),
-                trace,
-            }),
-            Err(e) => debug!("error tracing thread {}: {}", thread.0, e),
+impl Default for TraceOptions {
+    fn default() -> TraceOptions {
+        TraceOptions {
+            thread_names: false,
+            procedure_names: false,
+            procedure_info: false,
         }
     }
+}
 
-    Ok(traces)
+impl TraceOptions {
+    pub fn new() -> TraceOptions {
+        TraceOptions::default()
+    }
+
+    pub fn thread_names(&mut self, thread_names: bool) -> &mut TraceOptions {
+        self.thread_names = thread_names;
+        self
+    }
+
+    pub fn procedure_names(&mut self, procedure_names: bool) -> &mut TraceOptions {
+        self.procedure_names = procedure_names;
+        self
+    }
+
+    pub fn procedure_info(&mut self, procedure_info: bool) -> &mut TraceOptions {
+        self.procedure_info = procedure_info;
+        self
+    }
+
+    pub fn trace(&self, pid: u32) -> Result<Vec<Thread>> {
+        let space = AddressSpace::new(&Accessors::ptrace(), Byteorder::DEFAULT)
+            .map_err(|e| Error(ErrorInner::Unwind(e)))?;
+        let threads = get_threads(pid)?;
+
+        let mut traces = vec![];
+
+        for thread in &threads {
+            let name = if self.thread_names {
+                get_name(pid, thread.0)
+            } else {
+                None
+            };
+
+            match thread.dump(&space, self) {
+                Ok(trace) => traces.push(Thread {
+                    id: thread.0,
+                    name,
+                    trace,
+                }),
+                Err(e) => debug!("error tracing thread {}: {}", thread.0, e),
+            }
+        }
+
+        Ok(traces)
+    }
 }
 
 fn get_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
@@ -180,6 +207,8 @@ fn get_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
 
     let path = format!("/proc/{}/task", pid);
 
+    // new threads may be create while we're in the process of stopping them all, so loop a couple
+    // of times to converge
     for _ in 0..4 {
         let prev = threads.len();
         add_threads(&mut threads, &path)?;
@@ -221,6 +250,18 @@ fn add_threads(threads: &mut BTreeSet<TracedThread>, dir: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn get_name(pid: u32, tid: u32) -> Option<String> {
+    let path = format!("/proc/{}/task/{}/comm", pid, tid);
+    let mut name = vec![];
+    match File::open(path).and_then(|mut f| f.read_to_end(&mut name)) {
+        Ok(_) => Some(String::from_utf8_lossy(&name).trim().to_string()),
+        Err(e) => {
+            debug!("error getting name for thread {}: {}", tid, e);
+            None
+        }
+    }
 }
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
@@ -289,26 +330,41 @@ impl TracedThread {
         }
     }
 
-    fn dump(&self, space: &AddressSpace<PTraceStateRef>) -> unwind::Result<Vec<Frame>> {
+    fn dump(
+        &self,
+        space: &AddressSpace<PTraceStateRef>,
+        options: &TraceOptions,
+    ) -> unwind::Result<Vec<Frame>> {
         let state = PTraceState::new(self.0)?;
         let mut cursor = Cursor::remote(&space, &state)?;
 
         let mut trace = vec![];
         loop {
             let ip = cursor.register(RegNum::IP)? as usize;
-            let is_signal = cursor.is_signal_frame();
-            let name = cursor.procedure_name().map(|n| {
-                ProcedureName {
-                    name: n.name,
-                    offset: n.offset as usize,
-                }
-            });
-            let info = cursor.procedure_info().map(|i| {
-                ProcedureInfo {
-                    start_ip: i.start_ip as usize,
-                    end_ip: i.end_ip as usize,
-                }
-            });
+            let is_signal = cursor.is_signal_frame().ok();
+
+            let name = if options.procedure_names {
+                cursor.procedure_name().ok().map(|n| {
+                    ProcedureName {
+                        name: n.name,
+                        offset: n.offset as usize,
+                    }
+                })
+            } else {
+                None
+            };
+
+            let info = if options.procedure_info {
+                cursor.procedure_info().ok().map(|i| {
+                    ProcedureInfo {
+                        start_ip: i.start_ip as usize,
+                        end_ip: i.end_ip as usize,
+                    }
+                })
+            } else {
+                None
+            };
+
             trace.push(Frame {
                 ip,
                 is_signal,

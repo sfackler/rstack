@@ -52,7 +52,7 @@ pub struct Symbol {
     pub line: Option<u64>,
 }
 
-pub fn trace_threads(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Sync + Send>> {
+pub fn trace(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Sync + Send>> {
     let _guard = TRACE_LOCK.lock();
 
     let mut child = child
@@ -199,14 +199,16 @@ pub fn child() {
 fn child_trace() -> Result<Vec<RawThread>, String> {
     let parent = unsafe { getppid() } as u32;
 
-    match rstack::trace_threads(parent) {
+    match rstack::TraceOptions::new().thread_names(true).trace(parent) {
         Ok(threads) => Ok(
             threads
                 .into_iter()
                 .map(|thread| {
                     RawThread {
                         id: thread.id(),
-                        name: thread.name().to_string(),
+                        name: thread
+                            .name()
+                            .map_or_else(|| "<unknown>".to_string(), |s| s.to_string()),
                         frames: thread
                             .trace()
                             .iter()
