@@ -245,11 +245,11 @@ fn add_threads(threads: &mut BTreeSet<TracedThread>, dir: &str) -> Result<()> {
             let thread = match TracedThread::new(pid) {
                 Ok(thread) => thread,
                 // ESRCH just means the thread died in the middle of things, which is fine
-                Err(e) => if e.raw_os_error() != Some(ESRCH) {
-                    return Err(Error(ErrorInner::Io(e)));
-                } else {
+                Err(e) => if e.raw_os_error() == Some(ESRCH) {
                     debug!("error attaching to thread {}: {}", pid, e);
                     continue;
+                } else {
+                    return Err(Error(ErrorInner::Io(e)));
                 },
             };
             threads.insert(thread);
