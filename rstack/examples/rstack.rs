@@ -18,7 +18,7 @@ fn main() {
         }
     };
 
-    let threads = match rstack::trace_threads(pid) {
+    let threads = match rstack::trace(pid) {
         Ok(threads) => threads,
         Err(e) => {
             eprintln!("error tracing threads: {}", e);
@@ -27,15 +27,21 @@ fn main() {
     };
 
     for thread in threads {
-        println!("thread {} - {}", thread.id(), thread.name());
+        println!(
+            "thread {} - {}",
+            thread.id(),
+            thread.name().unwrap_or("<unknown>")
+        );
         for frame in thread.trace() {
             match (frame.name(), frame.info()) {
-                (Ok(name), Ok(info)) if frame.ip() - name.offset() == info.start_ip() => println!(
-                    "{:#016x} - {} + {:#x}",
-                    frame.ip(),
-                    name.name(),
-                    name.offset()
-                ),
+                (Some(name), Some(info)) if frame.ip() - name.offset() == info.start_ip() => {
+                    println!(
+                        "{:#016x} - {} + {:#x}",
+                        frame.ip(),
+                        name.name(),
+                        name.offset()
+                    )
+                }
                 _ => println!("{:#016x} - ???", frame.ip()),
             }
         }

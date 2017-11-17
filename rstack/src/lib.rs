@@ -202,6 +202,14 @@ impl TraceOptions {
     }
 }
 
+pub fn trace(pid: u32) -> Result<Vec<Thread>> {
+    TraceOptions::new()
+        .thread_names(true)
+        .procedure_names(true)
+        .procedure_info(true)
+        .trace(pid)
+}
+
 fn get_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
     let mut threads = BTreeSet::new();
 
@@ -378,36 +386,5 @@ impl TracedThread {
         }
 
         Ok(trace)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::process::Command;
-
-    use super::*;
-
-    #[test]
-    fn traced_thread() {
-        let _ = env_logger::init();
-
-        let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT).unwrap();
-
-        let mut child = Command::new("sleep").arg("10").spawn().unwrap();
-
-        let thread = TracedThread::new(child.id()).unwrap();
-        let trace = thread.dump(&space).unwrap();
-        drop(thread);
-
-        for frame in &trace {
-            println!(
-                "{:#x} - {} + {:#x}",
-                frame.ip(),
-                frame.name().ok().map_or("<unknown>", |s| s.name()),
-                frame.name().ok().map_or(0, |s| s.offset())
-            );
-        }
-
-        child.kill().unwrap();
     }
 }
