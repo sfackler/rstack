@@ -1,3 +1,13 @@
+//! Thread stack traces of remote processes.
+//!
+//! `rstack` (named after Java's `jstack`) uses [libunwind]'s ptrace interface to capture stack
+//! traces of the threads of a remote process. It currently only supports Linux with a kernel
+//! version of 3.4 or higher, and requires that the `/proc` pseudo-filesystem be mounted and
+//! accessible.
+//!
+//! [libunwind]: http://www.nongnu.org/libunwind/
+
+#![warn(missing_docs)]
 extern crate libc;
 extern crate unwind;
 
@@ -19,6 +29,7 @@ use std::collections::BTreeSet;
 use std::ptr;
 use unwind::{Accessors, AddressSpace, Byteorder, Cursor, PTraceState, PTraceStateRef, RegNum};
 
+/// The result type returned by methods in this crate.
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -27,6 +38,7 @@ enum ErrorInner {
     Unwind(unwind::Error),
 }
 
+/// The error type returned by methods in this crate.
 #[derive(Debug)]
 pub struct Error(ErrorInner);
 
@@ -52,29 +64,34 @@ impl error::Error for Error {
     }
 }
 
+/// Information about a thread of a remote process.
 pub struct Thread {
     id: u32,
     name: Option<String>,
-    trace: Vec<Frame>,
+    frames: Vec<Frame>,
 }
 
 impl Thread {
+    /// Returns the thread's ID.
     #[inline]
     pub fn id(&self) -> u32 {
         self.id
     }
 
+    /// Returns the thread's name, if known.
     #[inline]
     pub fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|s| &**s)
     }
 
+    /// Returns the frames of the stack trace representing the state of the thread.
     #[inline]
-    pub fn trace(&self) -> &[Frame] {
-        &self.trace
+    pub fn frames(&self) -> &[Frame] {
+        &self.frames
     }
 }
 
+/// Information about a stack frame of a remote process.
 pub struct Frame {
     ip: usize,
     is_signal: Option<bool>,
@@ -83,61 +100,77 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// Returns the instruction pointer of the frame.
     #[inline]
     pub fn ip(&self) -> usize {
         self.ip
     }
 
+    /// Determines if the frame is from a signal handler, if known.
     #[inline]
     pub fn is_signal(&self) -> Option<bool> {
         self.is_signal
     }
 
+    /// Returns the name of the procedure that this frame is running, if known.
+    ///
+    /// In certain contexts, particularly when the binary being traced or its dynamic libraries have
+    /// been stripped, the unwinder may not have enough information to properly identify the
+    /// procedure and will simply return the first label before the frame's instruction pointer. The
+    /// offset will always be relative to this label.
     #[inline]
     pub fn name(&self) -> Option<&ProcedureName> {
         self.name.as_ref()
     }
 
+    /// Returns information about the procedure that this frame is running, if known.
     #[inline]
     pub fn info(&self) -> Option<&ProcedureInfo> {
         self.info.as_ref()
     }
 }
 
+/// Information about a name of a procedure.
 pub struct ProcedureName {
     name: String,
     offset: usize,
 }
 
 impl ProcedureName {
+    /// Returns the name of the procedure.
     #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the offset of the instruction pointer from this procedure's starting address.
     #[inline]
     pub fn offset(&self) -> usize {
         self.offset
     }
 }
 
+/// Information about a procedure.
 pub struct ProcedureInfo {
     start_ip: usize,
     end_ip: usize,
 }
 
 impl ProcedureInfo {
+    /// Returns the starting address of this procedure.
     #[inline]
     pub fn start_ip(&self) -> usize {
         self.start_ip
     }
 
+    /// Returns the ending address of this procedure.
     #[inline]
     pub fn end_ip(&self) -> usize {
         self.end_ip
     }
 }
 
+/// A struct controlling the behavior of tracing.
 pub struct TraceOptions {
     thread_names: bool,
     procedure_names: bool,
@@ -155,25 +188,38 @@ impl Default for TraceOptions {
 }
 
 impl TraceOptions {
+    /// Returns a new `TraceOptions` with default settings.
     pub fn new() -> TraceOptions {
         TraceOptions::default()
     }
 
+    /// If set, the names of the process's threads will be recorded.
+    ///
+    /// Defaults to `false`.
     pub fn thread_names(&mut self, thread_names: bool) -> &mut TraceOptions {
         self.thread_names = thread_names;
         self
     }
 
+    /// If set, the names of the procedures running in the frames of the process's threads will be
+    /// recorded.
+    ///
+    /// Defaults to `false`.
     pub fn procedure_names(&mut self, procedure_names: bool) -> &mut TraceOptions {
         self.procedure_names = procedure_names;
         self
     }
 
+    /// If set, information about the procedures running in the frames of the process's threads will
+    /// be recorded.
+    ///
+    /// Defaults to `false`.
     pub fn procedure_info(&mut self, procedure_info: bool) -> &mut TraceOptions {
         self.procedure_info = procedure_info;
         self
     }
 
+    /// Traces the threads of the specified process.
     pub fn trace(&self, pid: u32) -> Result<Vec<Thread>> {
         let space = AddressSpace::new(&Accessors::ptrace(), Byteorder::DEFAULT)
             .map_err(|e| Error(ErrorInner::Unwind(e)))?;
@@ -189,10 +235,10 @@ impl TraceOptions {
             };
 
             match thread.dump(&space, self) {
-                Ok(trace) => traces.push(Thread {
+                Ok(frames) => traces.push(Thread {
                     id: thread.0,
                     name,
-                    trace,
+                    frames,
                 }),
                 Err(e) => debug!("error tracing thread {}: {}", thread.0, e),
             }
@@ -202,6 +248,7 @@ impl TraceOptions {
     }
 }
 
+/// A convenience wrapper over `TraceOptions` which returns a maximally verbose trace.
 pub fn trace(pid: u32) -> Result<Vec<Thread>> {
     TraceOptions::new()
         .thread_names(true)
