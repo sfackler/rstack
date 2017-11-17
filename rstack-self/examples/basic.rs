@@ -13,7 +13,7 @@ fn thread_2() {
 fn main() {
     let args = env::args().collect::<Vec<_>>();
     if args.len() > 1 {
-        rstack_self::child();
+        let _ = rstack_self::child();
         return;
     }
 

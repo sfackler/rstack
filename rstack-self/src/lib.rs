@@ -139,16 +139,18 @@ struct RawFrame {
     is_signal: bool,
 }
 
-pub fn child() {
+pub fn child() -> Result<(), Box<Error + Sync + Send>> {
     let mut stdin = io::stdin();
     let mut stdout = io::stdout();
 
     let mut buf = [0];
-    stdin.read_exact(&mut buf).expect("first wait");
+    stdin.read_exact(&mut buf)?;
     let trace = child_trace();
-    bincode::serialize_into(&mut stdout, &trace, bincode::Infinite).expect("serialize");
-    stdout.flush().expect("flush");
-    stdin.read_exact(&mut buf).expect("second wait");
+    bincode::serialize_into(&mut stdout, &trace, bincode::Infinite)?;
+    stdout.flush()?;
+    stdin.read_exact(&mut buf)?;
+
+    Ok(())
 }
 
 fn child_trace() -> Result<Vec<RawThread>, String> {
