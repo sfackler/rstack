@@ -1,19 +1,11 @@
-extern crate addr2line;
 extern crate antidote;
+extern crate backtrace;
 extern crate bincode;
-extern crate cpp_demangle;
-extern crate fallible_iterator;
-extern crate gimli;
 extern crate libc;
-extern crate memmap;
-extern crate object;
 extern crate rstack;
-extern crate rustc_demangle;
 
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
@@ -21,14 +13,11 @@ extern crate serde_derive;
 extern crate env_logger;
 
 use antidote::Mutex;
-use fallible_iterator::FallibleIterator;
 use libc::{c_ulong, getppid, prctl, PR_SET_PTRACER};
 use std::process::{Command, Stdio};
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::io::{self, BufReader, Read, Write};
-
-mod dylibs;
 
 lazy_static! {
     static ref TRACE_LOCK: Mutex<()> = Mutex::new(());
@@ -42,14 +31,13 @@ pub struct Thread {
 
 pub struct Frame {
     pub ip: usize,
-    pub library: Option<&'static Path>,
     pub symbols: Vec<Symbol>,
 }
 
 pub struct Symbol {
     pub name: Option<String>,
     pub file: Option<PathBuf>,
-    pub line: Option<u64>,
+    pub line: Option<u32>,
 }
 
 pub fn trace(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Sync + Send>> {
@@ -116,7 +104,6 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
     for raw_frame in raw.frames {
         let mut frame = Frame {
             ip: raw_frame.ip,
-            library: None,
             symbols: vec![],
         };
 
@@ -125,45 +112,13 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
         } else {
             raw_frame.ip - 1
         };
-        if let Some(info) = dylibs::query(current_ip) {
-            frame.library = info.library;
-
-            let symbols = info.frames.and_then(|it| {
-                it.map(|raw_symbol| {
-                    let mut symbol = Symbol {
-                        name: None,
-                        file: None,
-                        line: None,
-                    };
-                    if let Some(function) = raw_symbol.function {
-                        symbol.name = Some(function.to_string());
-                    }
-                    if let Some(location) = raw_symbol.location {
-                        symbol.file = location.file;
-                        symbol.line = location.line;
-                    }
-
-                    symbol
-                }).collect()
+        backtrace::resolve(current_ip as *mut _, |symbol| {
+            frame.symbols.push(Symbol {
+                name: symbol.name().map(|s| s.to_string()),
+                file: symbol.filename().map(|p| p.to_owned()),
+                line: symbol.lineno(),
             });
-
-            match symbols {
-                Ok(symbols) => frame.symbols = symbols,
-                Err(e) => {
-                    debug!("error querying debug info for {:#016}: {}", current_ip, e);
-                }
-            }
-
-            if frame.symbols.is_empty() {
-                if let Some(name) = info.symbol {
-                    frame.symbols.push(Symbol {
-                        name: Some(name.to_string()),
-                        file: None,
-                        line: None,
-                    });
-                }
-            }
-        }
+        });
 
         thread.frames.push(frame);
     }
