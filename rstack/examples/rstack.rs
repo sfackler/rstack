@@ -32,7 +32,7 @@ fn main() {
             thread.id(),
             thread.name().unwrap_or("<unknown>")
         );
-        for frame in thread.trace() {
+        for frame in thread.frames() {
             match (frame.name(), frame.info()) {
                 (Some(name), Some(info)) if frame.ip() - name.offset() == info.start_ip() => {
                     println!(

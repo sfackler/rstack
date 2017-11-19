@@ -167,7 +167,7 @@ fn child_trace() -> Result<Vec<RawThread>, String> {
                             .name()
                             .map_or_else(|| "<unknown>".to_string(), |s| s.to_string()),
                         frames: thread
-                            .trace()
+                            .frames()
                             .iter()
                             .map(|f| {
                                 RawFrame {
