@@ -64,6 +64,19 @@ impl error::Error for Error {
     }
 }
 
+/// Information about a remote process.
+#[derive(Debug, Clone)]
+pub struct Process {
+    threads: Vec<Thread>,
+}
+
+impl Process {
+    /// Returns information about the threads of the process.
+    pub fn threads(&self) -> &[Thread] {
+        &self.threads
+    }
+}
+
 /// Information about a thread of a remote process.
 #[derive(Debug, Clone)]
 pub struct Thread {
@@ -225,7 +238,7 @@ impl TraceOptions {
     }
 
     /// Traces the threads of the specified process.
-    pub fn trace(&self, pid: u32) -> Result<Vec<Thread>> {
+    pub fn trace(&self, pid: u32) -> Result<Process> {
         let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT)
             .map_err(|e| Error(ErrorInner::Unwind(e)))?;
         let threads = get_threads(pid)?;
@@ -249,12 +262,12 @@ impl TraceOptions {
             }
         }
 
-        Ok(traces)
+        Ok(Process { threads: traces })
     }
 }
 
 /// A convenience wrapper over `TraceOptions` which returns a maximally verbose trace.
-pub fn trace(pid: u32) -> Result<Vec<Thread>> {
+pub fn trace(pid: u32) -> Result<Process> {
     TraceOptions::new()
         .thread_names(true)
         .procedure_names(true)

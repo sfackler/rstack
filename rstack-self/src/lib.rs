@@ -157,9 +157,10 @@ fn child_trace() -> Result<Vec<RawThread>, String> {
     let parent = unsafe { getppid() } as u32;
 
     match rstack::TraceOptions::new().thread_names(true).trace(parent) {
-        Ok(threads) => Ok(
-            threads
-                .into_iter()
+        Ok(process) => Ok(
+            process
+                .threads()
+                .iter()
                 .map(|thread| {
                     RawThread {
                         id: thread.id(),

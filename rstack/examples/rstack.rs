@@ -18,7 +18,7 @@ fn main() {
         }
     };
 
-    let threads = match rstack::trace(pid) {
+    let process = match rstack::trace(pid) {
         Ok(threads) => threads,
         Err(e) => {
             eprintln!("error tracing threads: {}", e);
@@ -26,7 +26,7 @@ fn main() {
         }
     };
 
-    for thread in threads {
+    for thread in process.threads() {
         println!(
             "thread {} - {}",
             thread.id(),
