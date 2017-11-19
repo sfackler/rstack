@@ -358,6 +358,8 @@ impl TracedThread {
                 return Err(io::Error::last_os_error());
             }
 
+            let thread = TracedThread(pid);
+
             let ret = ptrace(
                 PTRACE_INTERRUPT,
                 pid as pid_t,
@@ -375,8 +377,6 @@ impl TracedThread {
                     return Err(e);
                 }
             }
-
-            let thread = TracedThread(pid);
 
             if !WIFSTOPPED(status) {
                 return Err(io::Error::new(
