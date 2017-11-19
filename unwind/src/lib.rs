@@ -47,6 +47,7 @@ extern crate foreign_types;
 
 use foreign_types::Opaque;
 use libc::{c_char, c_int, c_void};
+use std::ffi::CStr;
 use std::fmt;
 use std::error;
 use std::mem;
@@ -96,20 +97,11 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let s = match -self.0 {
-            UNW_EUNSPEC => "unspecified error",
-            UNW_ENOMEM => "out of memory",
-            UNW_EBADREG => "bad register number",
-            UNW_EREADONLYREG => "attempt to write read-only register",
-            UNW_ESTOPUNWIND => "stop unwinding",
-            UNW_EINVALIDIP => "invalid IP",
-            UNW_EBADFRAME => "bad frame",
-            UNW_EINVAL => "unsupported operation or bad value",
-            UNW_EBADVERSION => "unwind info has unsupported version",
-            UNW_ENOINFO => "no unwind info found",
-            _ => return write!(fmt, "unknown error {}", self.0),
-        };
-        fmt.write_str(s)
+        unsafe {
+            let err = unw_strerror(self.0);
+            let err = CStr::from_ptr(err).to_string_lossy();
+            fmt.write_str(&err)
+        }
     }
 }
 
@@ -379,7 +371,7 @@ impl<'a> Cursor<'a> {
     /// Returns the name of the procedure of the current frame.
     ///
     /// The name is copied into the provided buffer, and is null-terminated. If the buffer is too
-    /// small to hold the full name, [`Error::NOMEM`] is returned, and the buffer contains the
+    /// small to hold the full name, [`Error::NOMEM`] is returned and the buffer contains the
     /// portion of the name that fits (including the null terminator).
     ///
     /// The offset of the instruction pointer from the beginning of the identified procedure is

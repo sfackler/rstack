@@ -109,6 +109,9 @@ extern "C" {
         offp: *mut unw_word_t,
     ) -> c_int;
 
+    #[link_name = "_Ux86_64_strerror"]
+    pub fn unw_strerror(err_code: c_int) -> *const c_char;
+
     #[link_name = "_Ux86_64_local_addr_space"]
     pub static unw_local_addr_space: unw_addr_space_t;
 }
