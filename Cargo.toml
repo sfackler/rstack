@@ -7,3 +7,6 @@ members = [
     "unwind",
     "unwind-sys",
 ]
+
+[patch.crates-io]
+libc = { git = "https://github.com/rust-lang/libc" }
