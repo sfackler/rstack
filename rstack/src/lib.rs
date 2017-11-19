@@ -67,10 +67,16 @@ impl error::Error for Error {
 /// Information about a remote process.
 #[derive(Debug, Clone)]
 pub struct Process {
+    id: u32,
     threads: Vec<Thread>,
 }
 
 impl Process {
+    /// Returns the process's ID.
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
     /// Returns information about the threads of the process.
     pub fn threads(&self) -> &[Thread] {
         &self.threads
@@ -262,7 +268,10 @@ impl TraceOptions {
             }
         }
 
-        Ok(Process { threads: traces })
+        Ok(Process {
+            id: pid,
+            threads: traces,
+        })
     }
 }
 
