@@ -65,6 +65,7 @@ impl error::Error for Error {
 }
 
 /// Information about a thread of a remote process.
+#[derive(Debug, Clone)]
 pub struct Thread {
     id: u32,
     name: Option<String>,
@@ -92,6 +93,7 @@ impl Thread {
 }
 
 /// Information about a stack frame of a remote process.
+#[derive(Debug, Clone)]
 pub struct Frame {
     ip: usize,
     is_signal: Option<bool>,
@@ -131,6 +133,7 @@ impl Frame {
 }
 
 /// Information about a name of a procedure.
+#[derive(Debug, Clone)]
 pub struct ProcedureName {
     name: String,
     offset: usize,
@@ -151,6 +154,7 @@ impl ProcedureName {
 }
 
 /// Information about a procedure.
+#[derive(Debug, Clone)]
 pub struct ProcedureInfo {
     start_ip: usize,
     end_ip: usize,
@@ -171,6 +175,7 @@ impl ProcedureInfo {
 }
 
 /// A struct controlling the behavior of tracing.
+#[derive(Debug, Clone)]
 pub struct TraceOptions {
     thread_names: bool,
     procedure_names: bool,
@@ -221,7 +226,7 @@ impl TraceOptions {
 
     /// Traces the threads of the specified process.
     pub fn trace(&self, pid: u32) -> Result<Vec<Thread>> {
-        let space = AddressSpace::new(&Accessors::ptrace(), Byteorder::DEFAULT)
+        let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT)
             .map_err(|e| Error(ErrorInner::Unwind(e)))?;
         let threads = get_threads(pid)?;
 
