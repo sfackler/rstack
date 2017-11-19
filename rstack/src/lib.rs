@@ -14,9 +14,6 @@ extern crate unwind;
 #[macro_use]
 extern crate log;
 
-#[cfg(test)]
-extern crate env_logger;
-
 use libc::{c_void, pid_t, ptrace, waitpid, ESRCH, PTRACE_DETACH, PTRACE_INTERRUPT, PTRACE_SEIZE,
            WIFSTOPPED, __WALL};
 use std::borrow::Borrow;
