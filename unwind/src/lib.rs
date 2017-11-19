@@ -339,7 +339,7 @@ impl<'a> Cursor<'a> {
     /// Returns the value of an integral register at the current frame.
     ///
     /// Based on the calling convention, some registers may not be available in a stack frame.
-    pub fn register(&self, num: RegNum) -> Result<u64> {
+    pub fn register(&mut self, num: RegNum) -> Result<u64> {
         unsafe {
             let mut val = 0;
             let ret = unw_get_reg(&self.0 as *const _ as *mut _, num.0, &mut val);
@@ -352,7 +352,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Returns information about the procedure at the current frame.
-    pub fn procedure_info(&self) -> Result<ProcedureInfo> {
+    pub fn procedure_info(&mut self) -> Result<ProcedureInfo> {
         unsafe {
             let mut info = mem::uninitialized();
             let ret = unw_get_proc_info(&self.0 as *const _ as *mut _, &mut info);
@@ -385,7 +385,7 @@ impl<'a> Cursor<'a> {
     /// relative to this label.
     ///
     /// [`Error::NOMEM`]: struct.Error.html#associatedconstant.NOMEM
-    pub fn procedure_name_raw(&self, buf: &mut [u8], offset: &mut u64) -> Result<()> {
+    pub fn procedure_name_raw(&mut self, buf: &mut [u8], offset: &mut u64) -> Result<()> {
         unsafe {
             let mut raw_off = 0;
             let ret = unw_get_proc_name(
@@ -409,7 +409,7 @@ impl<'a> Cursor<'a> {
     /// unwinder may not have enough information to properly identify the procedure and will simply
     /// return the first label before the frame's instruction pointer. The offset will always be
     /// relative to this label.
-    pub fn procedure_name(&self) -> Result<ProcedureName> {
+    pub fn procedure_name(&mut self) -> Result<ProcedureName> {
         let mut buf = vec![0; 256];
         loop {
             let mut offset = 0;
@@ -438,7 +438,7 @@ impl<'a> Cursor<'a> {
     /// Signal frames are unique in several ways. More register state is available than normal, and
     /// the instruction pointer references the currently executing instruction rather than the next
     /// instruction.
-    pub fn is_signal_frame(&self) -> Result<bool> {
+    pub fn is_signal_frame(&mut self) -> Result<bool> {
         unsafe {
             let ret = unw_is_signal_frame(&self.0 as *const _ as *mut _);
             if ret < 0 {
