@@ -424,8 +424,8 @@ impl TracedThread {
             let name = if options.procedure_names {
                 cursor.procedure_name().ok().map(|n| {
                     ProcedureName {
-                        name: n.name,
-                        offset: n.offset as usize,
+                        name: n.name().to_string(),
+                        offset: n.offset() as usize,
                     }
                 })
             } else {
@@ -435,8 +435,8 @@ impl TracedThread {
             let info = if options.procedure_info {
                 cursor.procedure_info().ok().map(|i| {
                     ProcedureInfo {
-                        start_ip: i.start_ip as usize,
-                        end_ip: i.end_ip as usize,
+                        start_ip: i.start_ip() as usize,
+                        end_ip: i.end_ip() as usize,
                     }
                 })
             } else {

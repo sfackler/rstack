@@ -15,13 +15,13 @@
 //!         let ip = cursor.register(RegNum::IP)?;
 //!
 //!         match (cursor.procedure_info(), cursor.procedure_name()) {
-//!             (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
+//!             (Ok(ref info), Ok(ref name)) if ip == info.start_ip() + name.offset() => {
 //!                 println!(
 //!                     "{:#016x} - {} ({:#016x}) + {:#x}",
 //!                     ip,
-//!                     name.name,
-//!                     info.start_ip,
-//!                     name.offset
+//!                     name.name(),
+//!                     info.start_ip(),
+//!                     name.offset()
 //!                 );
 //!             }
 //!             _ => println!("{:#016x} - ????", ip),
@@ -244,23 +244,40 @@ impl RegNum {
 /// Information about a procedure.
 #[derive(Copy, Clone)]
 pub struct ProcedureInfo {
-    /// The starting address of the procedure.
-    pub start_ip: u64,
+    start_ip: u64,
+    end_ip: u64,
+}
 
-    /// The ending address of the procedure.
-    pub end_ip: u64,
-    _p: (),
+impl ProcedureInfo {
+    /// Returns the starting address of the procedure.
+    pub fn start_ip(&self) -> u64 {
+        self.start_ip
+    }
+
+    /// Returns the ending address of the procedure.
+    pub fn end_ip(&self) -> u64 {
+        self.end_ip
+    }
 }
 
 /// The name of a procedure.
 #[derive(Clone)]
 pub struct ProcedureName {
-    /// The name of the procedure.
-    pub name: String,
+    name: String,
+    offset: u64,
+}
 
-    /// The offset of the frame's instruction pointer from the named procedure.
-    pub offset: u64,
-    _p: (),
+impl ProcedureName {
+    /// Returns the name of the procedure.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the offset of the frame's instruction pointer from the starting address of the named
+    /// procedure.
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
 }
 
 /// A cursor into a frame of a stack.
@@ -360,7 +377,6 @@ impl<'a> Cursor<'a> {
                 Ok(ProcedureInfo {
                     start_ip: info.start_ip as u64,
                     end_ip: info.end_ip as u64,
-                    _p: (),
                 })
             } else {
                 Err(Error(ret))
@@ -421,7 +437,6 @@ impl<'a> Cursor<'a> {
                     return Ok(ProcedureName {
                         name,
                         offset: offset as u64,
-                        _p: (),
                     });
                 }
                 Err(Error::NOMEM) => {
