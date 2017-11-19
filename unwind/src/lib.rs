@@ -170,7 +170,7 @@ pub struct Accessors<T>(unw_accessors_t, PhantomData<T>);
 impl Accessors<PTraceStateRef> {
     /// Returns `Accessors` which use the ptrace system call to unwind a remote process.
     ///
-    /// THe `ptrace` Cargo feature must be enabled to use this type.
+    /// The `ptrace` Cargo feature must be enabled to use this type.
     pub fn ptrace() -> &'static Accessors<PTraceStateRef> {
         unsafe { &*(&_UPT_accessors as *const unw_accessors_t as *const Accessors<PTraceStateRef>) }
     }
