@@ -8,10 +8,6 @@ repository = "https://github.com/sfackler/rstack"
 categories = ["api-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
-[package.metadata.docs.rs]
-all-features = true
-dependencies = ["libunwind-dev"]
-
 [features]
 ptrace = ["unwind-sys/ptrace"]
 

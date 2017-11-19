@@ -9,10 +9,6 @@ repository = "https://github.com/sfackler/rstack"
 categories = ["external-ffi-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
-[package.metadata.docs.rs]
-all-features = true
-dependencies = ["libunwind-dev"]
-
 [features]
 ptrace = []
 
