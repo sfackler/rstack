@@ -1,6 +1,6 @@
 [package]
 name = "unwind"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "An interface to libunwind"
 license = "MIT/Apache-2.0"
@@ -16,4 +16,4 @@ ptrace = ["unwind-sys/ptrace"]
 libc = "0.2"
 foreign-types = "0.3"
 
-unwind-sys = { version = "0.1.0", path = "../unwind-sys" }
+unwind-sys = { version = "0.1.1", path = "../unwind-sys" }
