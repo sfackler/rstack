@@ -5,6 +5,7 @@ authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "An interface to libunwind"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/sfackler/rstack"
+documentation = "https://sfackler.github.io/rstack/doc/unwind"
 categories = ["api-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
