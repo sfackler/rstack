@@ -16,7 +16,7 @@ use antidote::Mutex;
 use libc::{c_ulong, getppid, prctl, PR_SET_PTRACER};
 use std::process::{Command, Stdio};
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io::{self, BufReader, Read, Write};
 
 lazy_static! {
@@ -24,20 +24,58 @@ lazy_static! {
 }
 
 pub struct Thread {
-    pub id: u32,
-    pub name: String,
-    pub frames: Vec<Frame>,
+    id: u32,
+    name: String,
+    frames: Vec<Frame>,
+}
+
+impl Thread {
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn frames(&self) -> &[Frame] {
+        &self.frames
+    }
 }
 
 pub struct Frame {
-    pub ip: usize,
-    pub symbols: Vec<Symbol>,
+    ip: usize,
+    symbols: Vec<Symbol>,
+}
+
+impl Frame {
+    pub fn ip(&self) -> usize {
+        self.ip
+    }
+
+    pub fn symbols(&self) -> &[Symbol] {
+        &self.symbols
+    }
 }
 
 pub struct Symbol {
-    pub name: Option<String>,
-    pub file: Option<PathBuf>,
-    pub line: Option<u32>,
+    name: Option<String>,
+    file: Option<PathBuf>,
+    line: Option<u32>,
+}
+
+impl Symbol {
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_ref().map(|n| &**n)
+    }
+
+    pub fn file(&self) -> Option<&Path> {
+        self.file.as_ref().map(|f| &**f)
+    }
+
+    pub fn line(&self) -> Option<u32> {
+        self.line
+    }
 }
 
 pub fn trace(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Sync + Send>> {

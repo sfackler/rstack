@@ -26,14 +26,14 @@ fn main() {
     let trace = rstack_self::trace(Command::new(exe).arg("child")).unwrap();
 
     for thread in trace {
-        println!("{} - {}", thread.id, thread.name);
-        for frame in thread.frames {
-            println!("{:#016x}", frame.ip);
+        println!("{} - {}", thread.id(), thread.name());
+        for frame in thread.frames() {
+            println!("{:#016x}", frame.ip());
 
-            for symbol in frame.symbols {
-                print!("    - {}", symbol.name.unwrap_or("????".to_string()));
-                if let Some(file) = symbol.file {
-                    print!(" {}:{}", file.display(), symbol.line.unwrap_or(0));
+            for symbol in frame.symbols() {
+                print!("    - {}", symbol.name().unwrap_or("????"));
+                if let Some(file) = symbol.file() {
+                    print!(" {}:{}", file.display(), symbol.line().unwrap_or(0));
                 }
                 println!();
             }
