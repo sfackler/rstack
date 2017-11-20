@@ -6,7 +6,7 @@
 //! accessible.
 //!
 //! [libunwind]: http://www.nongnu.org/libunwind/
-
+#![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
 extern crate libc;
 extern crate unwind;

@@ -2,9 +2,15 @@
 name = "rstack"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
+description = "Stack traces of remote processes"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/sfackler/rstack"
+documentation = "https://sfackler.github.io/rstack/doc/rstack"
+categories = ["api-bindings", "development-tools::debugging"]
+keywords = ["stack", "backtrace", "stacktrace"]
 
 [dependencies]
 libc = "0.2"
 log = "0.3"
 
-unwind = { path = "../unwind", features = ["ptrace"] }
+unwind = { version = "0.2", path = "../unwind", features = ["ptrace"] }
