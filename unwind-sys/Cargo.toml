@@ -6,7 +6,7 @@ links = "unwind"
 description = "FFI bindings to libunwind"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/sfackler/rstack"
-documentation = "https://sfackler.github.io/rstack/doc/unwind-sys"
+documentation = "https://sfackler.github.io/rstack/doc/unwind_sys"
 categories = ["external-ffi-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
