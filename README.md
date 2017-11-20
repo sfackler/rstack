@@ -1,7 +1,7 @@
 # rstack
 [![CircleCI](https://circleci.com/gh/sfackler/rstack.svg?style=shield)](https://circleci.com/gh/sfackler/rstack)
 
-[Documentation](https://docs.rs/rstack)
+[Documentation](https://sfackler.github.io/rstack/doc/rstack)
 
 Remote stack tracing.
 
