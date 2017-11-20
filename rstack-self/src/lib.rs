@@ -104,7 +104,9 @@ pub fn trace(child: &mut Command) -> Result<Vec<Thread>, Box<Error + Sync + Send
 
     stdin.write_all(&[0])?;
 
-    symbolicate(raw)
+    let threads = symbolicate(raw);
+
+    Ok(threads)
 }
 
 struct PtracerBomb(bool);
@@ -128,11 +130,11 @@ fn set_ptracer(pid: u32) -> io::Result<()> {
     }
 }
 
-fn symbolicate(raw: Vec<RawThread>) -> Result<Vec<Thread>, Box<Error + Sync + Send>> {
+fn symbolicate(raw: Vec<RawThread>) -> Vec<Thread> {
     raw.into_iter().map(symbolicate_thread).collect()
 }
 
-fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>> {
+fn symbolicate_thread(raw: RawThread) -> Thread {
     let mut thread = Thread {
         id: raw.id,
         name: raw.name,
@@ -161,7 +163,7 @@ fn symbolicate_thread(raw: RawThread) -> Result<Thread, Box<Error + Sync + Send>
         thread.frames.push(frame);
     }
 
-    Ok(thread)
+    thread
 }
 
 #[derive(Serialize, Deserialize)]
