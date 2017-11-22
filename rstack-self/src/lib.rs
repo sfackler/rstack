@@ -37,6 +37,8 @@
 //!     }
 //! }
 //! ```
+#![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
+#![warn(missing_docs)]
 extern crate antidote;
 extern crate backtrace;
 extern crate bincode;
