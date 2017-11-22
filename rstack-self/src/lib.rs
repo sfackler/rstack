@@ -239,7 +239,7 @@ fn symbolicate_thread(raw: RawThread) -> Thread {
             symbols: vec![],
         };
 
-        let current_ip = if raw_frame.is_signal {
+        let current_ip = if raw_frame.is_signal || raw_frame.ip == 0 {
             raw_frame.ip
         } else {
             raw_frame.ip - 1
