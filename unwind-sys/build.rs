@@ -11,8 +11,8 @@ fn main() {
     let library = pkg_config::probe_library(lib).unwrap();
 
     // There were some ABI changes from 1.1 to 1.2 on x86_64
-    if library.version.starts_with("1.2.") {
-        println!("cargo:rustc-cfg=unwind12x");
+    if library.version.starts_with("0.") || library.version.starts_with("1.1.") {
+        println!("cargo:rustc-cfg=unwind11x");
     }
 
     println!("cargo:version={}", library.version);
