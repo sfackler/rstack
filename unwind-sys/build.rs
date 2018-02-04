@@ -11,7 +11,11 @@ fn main() {
     let library = pkg_config::probe_library(lib).unwrap();
 
     // There were some ABI changes from 1.1 to 1.2 on x86_64
-    if library.version.starts_with("0.") || library.version.starts_with("1.1.") {
+    let mut it = library.version.split(|c: char| !c.is_digit(10));
+    let major = it.next().unwrap();
+    let minor = it.next().unwrap();
+
+    if major == "0" || (major == "1" && (minor == "0" || minor == "1")) {
         println!("cargo:rustc-cfg=unwind11x");
     }
 
