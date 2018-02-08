@@ -437,7 +437,7 @@ impl<'a> Cursor<'a> {
                     let name = String::from_utf8_lossy(&buf).into_owned();
                     return Ok(ProcedureName {
                         name,
-                        offset: offset as u64,
+                        offset,
                     });
                 }
                 Err(Error::NOMEM) => {

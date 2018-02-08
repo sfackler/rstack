@@ -13,6 +13,14 @@ fn main() {
             .header("libunwind-ptrace.h");
     }
 
+    let version = env::var("DEP_UNWIND_VERSION").unwrap();
+    let mut it = version.split(".");
+    let major = it.next().unwrap().parse::<u32>().unwrap();
+    let minor = it.next().unwrap().parse::<u32>().unwrap();
+    if major < 1 || (major == 1 && minor < 2) {
+        cfg.cfg("pre12", None);
+    }
+
     cfg.header("libunwind.h")
         .type_name(|t, _| t.to_string())
         .skip_signededness(|t| match t {
