@@ -59,7 +59,7 @@ use std::error;
 use std::fmt;
 use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::result;
 
 lazy_static! {
@@ -170,20 +170,27 @@ impl Symbol {
 ///
 /// [`child`]: fn.child.html
 pub fn trace(child: &mut Command) -> Result<Vec<Thread>> {
+    let raw = trace_raw(child)?;
+    let threads = symbolicate(raw);
+    Ok(threads)
+}
+
+fn trace_raw(child: &mut Command) -> Result<Vec<RawThread>> {
     let _guard = TRACE_LOCK.lock();
 
-    let mut child = child
+    let child = child
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| Error(e.into()))?;
+    let mut child = ChildGuard(child);
 
-    let mut stdin = child.stdin.take().unwrap();
-    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    let mut stdin = child.0.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.0.stdout.take().unwrap());
 
-    set_ptracer(child.id()).map_err(|e| Error(e.into()))?;
-    let mut bomb = PtracerBomb(true);
+    set_ptracer(child.0.id()).map_err(|e| Error(e.into()))?;
+    let _guard = PtracerGuard;
 
     stdin.write_all(&[0]).map_err(|e| Error(e.into()))?;
 
@@ -191,23 +198,23 @@ pub fn trace(child: &mut Command) -> Result<Vec<Thread>> {
         bincode::deserialize_from(&mut stdout, bincode::Infinite).map_err(|e| Error(e.into()))?;
     let raw = raw.map_err(|e| Error(e.into()))?;
 
-    set_ptracer(0).map_err(|e| Error(Box::new(e)))?;
-    bomb.0 = false;
-
-    stdin.write_all(&[0]).map_err(|e| Error(Box::new(e)))?;
-
-    let threads = symbolicate(raw);
-
-    Ok(threads)
+    Ok(raw)
 }
 
-struct PtracerBomb(bool);
+struct ChildGuard(Child);
 
-impl Drop for PtracerBomb {
+impl Drop for ChildGuard {
     fn drop(&mut self) {
-        if self.0 {
-            let _ = set_ptracer(0);
-        }
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+struct PtracerGuard;
+
+impl Drop for PtracerGuard {
+    fn drop(&mut self) {
+        let _ = set_ptracer(0);
     }
 }
 
@@ -278,13 +285,16 @@ pub fn child() -> Result<()> {
     let mut stdin = io::stdin();
     let mut stdout = io::stdout();
 
+    // wait for the parent to tell us it's ready
     let mut buf = [0];
     stdin.read_exact(&mut buf).map_err(|e| Error(e.into()))?;
+
     let trace = child_trace();
     bincode::serialize_into(&mut stdout, &trace, bincode::Infinite).map_err(|e| Error(e.into()))?;
     stdout.flush().map_err(|e| Error(e.into()))?;
-    stdin.read_exact(&mut buf).map_err(|e| Error(e.into()))?;
 
+    // wait around for the parent to kill us, or die
+    let _ = stdin.read_exact(&mut buf);
     Ok(())
 }
 
@@ -292,30 +302,24 @@ fn child_trace() -> result::Result<Vec<RawThread>, String> {
     let parent = unsafe { getppid() } as u32;
 
     match rstack::TraceOptions::new().thread_names(true).trace(parent) {
-        Ok(process) => Ok(
-            process
-                .threads()
-                .iter()
-                .map(|thread| {
-                    RawThread {
-                        id: thread.id(),
-                        name: thread
-                            .name()
-                            .map_or_else(|| "<unknown>".to_string(), |s| s.to_string()),
-                        frames: thread
-                            .frames()
-                            .iter()
-                            .map(|f| {
-                                RawFrame {
-                                    ip: f.ip(),
-                                    is_signal: f.is_signal().unwrap_or(false),
-                                }
-                            })
-                            .collect(),
-                    }
-                })
-                .collect(),
-        ),
+        Ok(process) => Ok(process
+            .threads()
+            .iter()
+            .map(|thread| RawThread {
+                id: thread.id(),
+                name: thread
+                    .name()
+                    .map_or_else(|| "<unknown>".to_string(), |s| s.to_string()),
+                frames: thread
+                    .frames()
+                    .iter()
+                    .map(|f| RawFrame {
+                        ip: f.ip(),
+                        is_signal: f.is_signal().unwrap_or(false),
+                    })
+                    .collect(),
+            })
+            .collect()),
         Err(e) => Err(e.to_string()),
     }
 }
