@@ -1,6 +1,6 @@
 [package]
 name = "rstack"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "Stack traces of remote processes"
 license = "MIT/Apache-2.0"
