@@ -1,9 +1,8 @@
 //! Thread stack traces of remote processes.
 //!
 //! `rstack` (named after Java's `jstack`) uses [libunwind]'s ptrace interface to capture stack
-//! traces of the threads of a remote process. It currently only supports Linux with a kernel
-//! version of 3.4 or higher, and requires that the `/proc` pseudo-filesystem be mounted and
-//! accessible.
+//! traces of the threads of a remote process. It currently only supports Linux, and requires
+//! that the `/proc` pseudo-filesystem be mounted and accessible.
 //!
 //! [libunwind]: http://www.nongnu.org/libunwind/
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
@@ -14,16 +13,18 @@ extern crate unwind;
 #[macro_use]
 extern crate log;
 
-use libc::{c_void, pid_t, ptrace, waitpid, ESRCH, PTRACE_DETACH, PTRACE_INTERRUPT, PTRACE_SEIZE,
-           WIFSTOPPED, __WALL};
+use libc::{
+    c_void, pid_t, ptrace, waitpid, ESRCH, PTRACE_ATTACH, PTRACE_CONT, PTRACE_DETACH,
+    PTRACE_INTERRUPT, PTRACE_SEIZE, SIGSTOP, WIFSTOPPED, WSTOPSIG, __WALL,
+};
 use std::borrow::Borrow;
-use std::result;
-use std::io::{self, Read};
+use std::collections::BTreeSet;
+use std::error;
 use std::fmt;
 use std::fs::{self, File};
-use std::error;
-use std::collections::BTreeSet;
+use std::io::{self, Read};
 use std::ptr;
+use std::result;
 use unwind::{Accessors, AddressSpace, Byteorder, Cursor, PTraceState, PTraceStateRef, RegNum};
 
 /// The result type returned by methods in this crate.
@@ -374,7 +375,13 @@ impl TracedThread {
                 ptr::null_mut::<c_void>(),
             );
             if ret != 0 {
-                return Err(io::Error::last_os_error());
+                let e = io::Error::last_os_error();
+                // ptrace returns ESRCH is PTRACE_SEIZE isn't supported for some reason
+                if e.raw_os_error() == Some(ESRCH as i32) {
+                    return TracedThread::new_fallback(pid);
+                }
+
+                return Err(e);
             }
 
             let thread = TracedThread(pid);
@@ -408,6 +415,57 @@ impl TracedThread {
         }
     }
 
+    fn new_fallback(pid: u32) -> io::Result<TracedThread> {
+        unsafe {
+            let ret = ptrace(
+                PTRACE_ATTACH,
+                pid as pid_t,
+                ptr::null_mut::<c_void>(),
+                ptr::null_mut::<c_void>(),
+            );
+            if ret != 0 {
+                return Err(io::Error::last_os_error());
+            }
+
+            let thread = TracedThread(pid);
+
+            let mut status = 0;
+            loop {
+                let ret = waitpid(pid as pid_t, &mut status, __WALL);
+                if ret < 0 {
+                    let e = io::Error::last_os_error();
+                    if e.kind() != io::ErrorKind::Interrupted {
+                        return Err(e);
+                    }
+
+                    continue;
+                }
+
+                if !WIFSTOPPED(status) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("unexpected wait status {}", status),
+                    ));
+                }
+
+                let sig = WSTOPSIG(status);
+                if sig == SIGSTOP {
+                    return Ok(thread);
+                }
+
+                let ret = ptrace(
+                    PTRACE_CONT,
+                    pid as pid_t,
+                    ptr::null_mut::<c_void>(),
+                    sig as *const c_void,
+                );
+                if ret != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+        }
+    }
+
     fn dump(
         &self,
         space: &AddressSpace<PTraceStateRef>,
@@ -422,22 +480,18 @@ impl TracedThread {
             let is_signal = cursor.is_signal_frame().ok();
 
             let name = if options.procedure_names {
-                cursor.procedure_name().ok().map(|n| {
-                    ProcedureName {
-                        name: n.name().to_string(),
-                        offset: n.offset() as usize,
-                    }
+                cursor.procedure_name().ok().map(|n| ProcedureName {
+                    name: n.name().to_string(),
+                    offset: n.offset() as usize,
                 })
             } else {
                 None
             };
 
             let info = if options.procedure_info {
-                cursor.procedure_info().ok().map(|i| {
-                    ProcedureInfo {
-                        start_ip: i.start_ip() as usize,
-                        end_ip: i.end_ip() as usize,
-                    }
+                cursor.procedure_info().ok().map(|i| ProcedureInfo {
+                    start_ip: i.start_ip() as usize,
+                    end_ip: i.end_ip() as usize,
                 })
             } else {
                 None

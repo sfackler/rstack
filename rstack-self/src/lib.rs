@@ -189,8 +189,7 @@ fn trace_raw(child: &mut Command) -> Result<Vec<RawThread>> {
     let mut stdin = child.0.stdin.take().unwrap();
     let mut stdout = BufReader::new(child.0.stdout.take().unwrap());
 
-    set_ptracer(child.0.id()).map_err(|e| Error(e.into()))?;
-    let _guard = PtracerGuard;
+    let _guard = PtracerGuard::new(child.0.id()).map_err(|e| Error(e.into()))?;
 
     stdin.write_all(&[0]).map_err(|e| Error(e.into()))?;
 
@@ -210,11 +209,23 @@ impl Drop for ChildGuard {
     }
 }
 
-struct PtracerGuard;
+struct PtracerGuard(bool);
 
 impl Drop for PtracerGuard {
     fn drop(&mut self) {
-        let _ = set_ptracer(0);
+        if self.0 {
+            let _ = set_ptracer(0);
+        }
+    }
+}
+
+impl PtracerGuard {
+    fn new(pid: u32) -> io::Result<PtracerGuard> {
+        match set_ptracer(pid) {
+            Ok(()) => Ok(PtracerGuard(true)),
+            Err(ref e) if e.kind() == io::ErrorKind::InvalidInput => Ok(PtracerGuard(false)),
+            Err(e) => Err(e),
+        }
     }
 }
 
