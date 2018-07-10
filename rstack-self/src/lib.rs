@@ -194,7 +194,7 @@ fn trace_raw(child: &mut Command) -> Result<Vec<RawThread>> {
     stdin.write_all(&[0]).map_err(|e| Error(e.into()))?;
 
     let raw: result::Result<Vec<RawThread>, String> =
-        bincode::deserialize_from(&mut stdout, bincode::Infinite).map_err(|e| Error(e.into()))?;
+        bincode::deserialize_from(&mut stdout).map_err(|e| Error(e.into()))?;
     let raw = raw.map_err(|e| Error(e.into()))?;
 
     Ok(raw)
@@ -301,7 +301,7 @@ pub fn child() -> Result<()> {
     stdin.read_exact(&mut buf).map_err(|e| Error(e.into()))?;
 
     let trace = child_trace();
-    bincode::serialize_into(&mut stdout, &trace, bincode::Infinite).map_err(|e| Error(e.into()))?;
+    bincode::serialize_into(&mut stdout, &trace).map_err(|e| Error(e.into()))?;
     stdout.flush().map_err(|e| Error(e.into()))?;
 
     // wait around for the parent to kill us, or die
