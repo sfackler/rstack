@@ -61,6 +61,7 @@ use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::result;
+use std::time::{Duration, Instant};
 
 lazy_static! {
     static ref TRACE_LOCK: Mutex<()> = Mutex::new(());
@@ -158,6 +159,15 @@ impl Symbol {
     pub fn line(&self) -> Option<u32> {
         self.line
     }
+}
+
+///
+pub fn trace_timed(child: &mut Command) -> Result<(Vec<Thread>, Duration)> {
+    let start = Instant::now();
+    let raw = trace_raw(child)?;
+    let elapsed = start.elapsed();
+    let threads = symbolicate(raw);
+    Ok((threads, elapsed))
 }
 
 /// Returns stack traces of all of the threads the calling process.
@@ -327,10 +337,8 @@ fn child_trace() -> result::Result<Vec<RawThread>, String> {
                     .map(|f| RawFrame {
                         ip: f.ip(),
                         is_signal: f.is_signal().unwrap_or(false),
-                    })
-                    .collect(),
-            })
-            .collect()),
+                    }).collect(),
+            }).collect()),
         Err(e) => Err(e.to_string()),
     }
 }
