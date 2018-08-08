@@ -161,8 +161,8 @@ impl Symbol {
     }
 }
 
-///
-pub fn trace_timed(child: &mut Command) -> Result<(Vec<Thread>, Duration)> {
+#[doc(hidden)]
+pub fn __private_api_trace_timed(child: &mut Command) -> Result<(Vec<Thread>, Duration)> {
     let start = Instant::now();
     let raw = trace_raw(child)?;
     let elapsed = start.elapsed();
