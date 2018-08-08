@@ -1,6 +1,6 @@
 [package]
 name = "rstack-self"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "Stack traces of all threads of a process"
 license = "MIT/Apache-2.0"
