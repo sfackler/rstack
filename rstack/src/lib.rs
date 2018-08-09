@@ -191,9 +191,19 @@ impl ProcedureInfo {
     }
 }
 
+/// A convenience wrapper over `TraceOptions` which returns a maximally verbose trace.
+pub fn trace(pid: u32) -> Result<Process> {
+    TraceOptions::new()
+        .thread_names(true)
+        .procedure_names(true)
+        .procedure_info(true)
+        .trace(pid)
+}
+
 /// A struct controlling the behavior of tracing.
 #[derive(Debug, Clone)]
 pub struct TraceOptions {
+    snapshot: bool,
     thread_names: bool,
     procedure_names: bool,
     procedure_info: bool,
@@ -202,6 +212,7 @@ pub struct TraceOptions {
 impl Default for TraceOptions {
     fn default() -> TraceOptions {
         TraceOptions {
+            snapshot: true,
             thread_names: false,
             procedure_names: false,
             procedure_info: false,
@@ -213,6 +224,17 @@ impl TraceOptions {
     /// Returns a new `TraceOptions` with default settings.
     pub fn new() -> TraceOptions {
         TraceOptions::default()
+    }
+
+    /// If set, the threads of the processed will be traced in a consistent snapshot.
+    ///
+    /// A snapshot-mode trace ensures a consistent view of all threads, but requires that all
+    /// threads be paused for the entire duration of the trace.
+    ///
+    /// Defaults to `true`.
+    pub fn snapshot(&mut self, snapshot: bool) -> &mut TraceOptions {
+        self.snapshot = snapshot;
+        self
     }
 
     /// If set, the names of the process's threads will be recorded.
@@ -245,7 +267,7 @@ impl TraceOptions {
     pub fn trace(&self, pid: u32) -> Result<Process> {
         let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT)
             .map_err(|e| Error(ErrorInner::Unwind(e)))?;
-        let threads = get_threads(pid)?;
+        let threads = snapshot_threads(pid)?;
 
         let mut traces = vec![];
 
@@ -273,16 +295,7 @@ impl TraceOptions {
     }
 }
 
-/// A convenience wrapper over `TraceOptions` which returns a maximally verbose trace.
-pub fn trace(pid: u32) -> Result<Process> {
-    TraceOptions::new()
-        .thread_names(true)
-        .procedure_names(true)
-        .procedure_info(true)
-        .trace(pid)
-}
-
-fn get_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
+fn snapshot_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
     let mut threads = BTreeSet::new();
 
     let path = format!("/proc/{}/task", pid);
@@ -300,21 +313,10 @@ fn get_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
     Ok(threads)
 }
 
-fn add_threads(threads: &mut BTreeSet<TracedThread>, dir: &str) -> Result<()> {
-    for entry in fs::read_dir(dir).map_err(|e| Error(ErrorInner::Io(e)))? {
-        let entry = entry.map_err(|e| Error(ErrorInner::Io(e)))?;
-
-        let pid = match entry
-            .file_name()
-            .to_str()
-            .and_then(|s| s.parse::<u32>().ok())
-        {
-            Some(pid) => pid,
-            None => continue,
-        };
-
-        if !threads.contains(&pid) {
-            let thread = match TracedThread::new(pid) {
+fn add_threads(threads: &mut BTreeSet<TracedThread>, pid: u32) -> Result<()> {
+    each_thread(pid, |tid| {
+        if !threads.contains(&tid) {
+            let thread = match TracedThread::new(tid) {
                 Ok(thread) => thread,
                 // ESRCH just means the thread died in the middle of things, which is fine
                 Err(e) => if e.raw_os_error() == Some(ESRCH) {
@@ -326,8 +328,27 @@ fn add_threads(threads: &mut BTreeSet<TracedThread>, dir: &str) -> Result<()> {
             };
             threads.insert(thread);
         }
-    }
 
+        Ok(())
+    })
+}
+
+fn each_thread<F>(pid: u32, mut f: F) -> Result<()>
+where
+    F: FnMut(u32) -> Result<()>,
+{
+    let dir = format!("/proc/{}/task", pid);
+    for entry in fs::read_dir(dir).map_err(|e| Error(ErrorInner::Io(e)))? {
+        let entry = entry.map_err(|e| Error(ErrorInner::Io(e)))?;
+
+        if let Ok(tid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|s| s.parse::<u32>().ok())
+        {
+            f(tid)?;
+        }
+    }
     Ok(())
 }
 
@@ -376,7 +397,7 @@ impl TracedThread {
             );
             if ret != 0 {
                 let e = io::Error::last_os_error();
-                // ptrace returns ESRCH is PTRACE_SEIZE isn't supported for some reason
+                // ptrace returns ESRCH if PTRACE_SEIZE isn't supported for some reason
                 if e.raw_os_error() == Some(ESRCH as i32) {
                     return TracedThread::new_fallback(pid);
                 }
