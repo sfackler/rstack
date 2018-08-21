@@ -267,44 +267,65 @@ impl TraceOptions {
     pub fn trace(&self, pid: u32) -> Result<Process> {
         let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT)
             .map_err(|e| Error(ErrorInner::Unwind(e)))?;
+
+        let threads = if self.snapshot {
+            self.trace_snapshot(pid, &space)?
+        } else {
+            self.trace_rolling(pid, &space)?
+        };
+
+        Ok(Process { id: pid, threads })
+    }
+
+    fn trace_snapshot(
+        &self,
+        pid: u32,
+        space: &AddressSpace<PTraceStateRef>,
+    ) -> Result<Vec<Thread>> {
         let threads = snapshot_threads(pid)?;
 
         let mut traces = vec![];
 
         for thread in &threads {
-            let name = if self.thread_names {
-                get_name(pid, thread.0)
-            } else {
-                None
-            };
-
-            match thread.dump(&space, self) {
-                Ok(frames) => traces.push(Thread {
-                    id: thread.0,
-                    name,
-                    frames,
-                }),
+            match thread.info(pid, space, self) {
+                Ok(thread) => traces.push(thread),
                 Err(e) => debug!("error tracing thread {}: {}", thread.0, e),
             }
         }
 
-        Ok(Process {
-            id: pid,
-            threads: traces,
-        })
+        Ok(traces)
+    }
+
+    fn trace_rolling(&self, pid: u32, space: &AddressSpace<PTraceStateRef>) -> Result<Vec<Thread>> {
+        let mut traces = vec![];
+
+        each_thread(pid, |tid| {
+            let thread = match TracedThread::new(tid) {
+                Ok(thread) => thread,
+                Err(ref e) if e.raw_os_error() == Some(ESRCH) => {
+                    debug!("error attaching to thread {}: {}", tid, e);
+                    return Ok(());
+                }
+                Err(e) => return Err(Error(ErrorInner::Io(e))),
+            };
+
+            let trace = thread.info(pid, space, self)?;
+            traces.push(trace);
+            Ok(())
+        })?;
+
+        Ok(traces)
     }
 }
 
 fn snapshot_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
     let mut threads = BTreeSet::new();
 
-    let path = format!("/proc/{}/task", pid);
-
     // new threads may be created while we're in the process of stopping them all, so loop a couple
     // of times to hopefully converge
     for _ in 0..5 {
         let prev = threads.len();
-        add_threads(&mut threads, &path)?;
+        add_threads(&mut threads, pid)?;
         if prev == threads.len() {
             break;
         }
@@ -321,7 +342,7 @@ fn add_threads(threads: &mut BTreeSet<TracedThread>, pid: u32) -> Result<()> {
                 // ESRCH just means the thread died in the middle of things, which is fine
                 Err(e) => if e.raw_os_error() == Some(ESRCH) {
                     debug!("error attaching to thread {}: {}", pid, e);
-                    continue;
+                    return Ok(());
                 } else {
                     return Err(Error(ErrorInner::Io(e)));
                 },
@@ -341,7 +362,7 @@ where
     for entry in fs::read_dir(dir).map_err(|e| Error(ErrorInner::Io(e)))? {
         let entry = entry.map_err(|e| Error(ErrorInner::Io(e)))?;
 
-        if let Ok(tid) = entry
+        if let Some(tid) = entry
             .file_name()
             .to_str()
             .and_then(|s| s.parse::<u32>().ok())
@@ -350,18 +371,6 @@ where
         }
     }
     Ok(())
-}
-
-fn get_name(pid: u32, tid: u32) -> Option<String> {
-    let path = format!("/proc/{}/task/{}/comm", pid, tid);
-    let mut name = vec![];
-    match File::open(path).and_then(|mut f| f.read_to_end(&mut name)) {
-        Ok(_) => Some(String::from_utf8_lossy(&name).trim().to_string()),
-        Err(e) => {
-            debug!("error getting name for thread {}: {}", tid, e);
-            None
-        }
-    }
 }
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
@@ -487,6 +496,28 @@ impl TracedThread {
         }
     }
 
+    fn info(
+        &self,
+        pid: u32,
+        space: &AddressSpace<PTraceStateRef>,
+        options: &TraceOptions,
+    ) -> Result<Thread> {
+        let name = if options.thread_names {
+            self.name(pid)
+        } else {
+            None
+        };
+
+        match self.dump(&space, options) {
+            Ok(frames) => Ok(Thread {
+                id: self.0,
+                name,
+                frames,
+            }),
+            Err(e) => Err(Error(ErrorInner::Unwind(e))),
+        }
+    }
+
     fn dump(
         &self,
         space: &AddressSpace<PTraceStateRef>,
@@ -531,5 +562,17 @@ impl TracedThread {
         }
 
         Ok(trace)
+    }
+
+    fn name(&self, pid: u32) -> Option<String> {
+        let path = format!("/proc/{}/task/{}/comm", pid, self.0);
+        let mut name = vec![];
+        match File::open(path).and_then(|mut f| f.read_to_end(&mut name)) {
+            Ok(_) => Some(String::from_utf8_lossy(&name).trim().to_string()),
+            Err(e) => {
+                debug!("error getting name for thread {}: {}", self.0, e);
+                None
+            }
+        }
     }
 }
