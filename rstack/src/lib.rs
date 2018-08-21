@@ -200,7 +200,7 @@ pub fn trace(pid: u32) -> Result<Process> {
         .trace(pid)
 }
 
-/// A struct controlling the behavior of tracing.
+/// Options controlling the behavior of tracing.
 #[derive(Debug, Clone)]
 pub struct TraceOptions {
     snapshot: bool,
@@ -226,7 +226,7 @@ impl TraceOptions {
         TraceOptions::default()
     }
 
-    /// If set, the threads of the processed will be traced in a consistent snapshot.
+    /// If set, the threads of the process will be traced in a consistent snapshot.
     ///
     /// A snapshot-mode trace ensures a consistent view of all threads, but requires that all
     /// threads be paused for the entire duration of the trace.
