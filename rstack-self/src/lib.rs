@@ -61,7 +61,6 @@ use std::io::{self, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::result;
-use std::time::{Duration, Instant};
 
 lazy_static! {
     static ref TRACE_LOCK: Mutex<()> = Mutex::new(());
@@ -87,6 +86,19 @@ impl error::Error for Error {
 
     fn cause(&self) -> Option<&error::Error> {
         error::Error::cause(&*self.0)
+    }
+}
+
+/// A trace of the threads in a process.
+#[derive(Debug, Clone)]
+pub struct Trace {
+    threads: Vec<Thread>,
+}
+
+impl Trace {
+    /// Returns the threads in the trace.
+    pub fn threads(&self) -> &[Thread] {
+        &self.threads
     }
 }
 
@@ -161,53 +173,84 @@ impl Symbol {
     }
 }
 
-#[doc(hidden)]
-pub fn __private_api_trace_timed(child: &mut Command) -> Result<(Vec<Thread>, Duration)> {
-    let start = Instant::now();
-    let raw = trace_raw(child)?;
-    let elapsed = start.elapsed();
-    let threads = symbolicate(raw);
-    Ok((threads, elapsed))
+/// Options controlling tracing.
+#[derive(Debug, Clone)]
+pub struct TraceOptions {
+    snapshot: bool,
 }
 
-/// Returns stack traces of all of the threads the calling process.
-///
-/// The provided `Command` should be configured to spawn a process which will call the [`child`]
-/// function. It must not use standard input or standard output, but standard error will be
-/// inherited and can be used. The spawned process must "directly" call `child` rather than
-/// spawning another process to call it. That is, the parent of the process that calls `child` is
-/// the one that will be traced.
-///
-/// [`child`]: fn.child.html
+impl Default for TraceOptions {
+    fn default() -> TraceOptions {
+        TraceOptions { snapshot: true }
+    }
+}
+
+impl TraceOptions {
+    /// Returns a new `TraceOptions` with default settings.
+    pub fn new() -> TraceOptions {
+        TraceOptions::default()
+    }
+
+    /// If set, the threads of the process will be traced in a consistent snapshot.
+    ///
+    /// A snapshot-mode trace ensures a consistent view of all threads, but requires that all
+    /// threads be paused for the entire duration of the trace.
+    ///
+    /// Defaults to `true`.
+    pub fn snapshot(&mut self, snapshot: bool) -> &mut TraceOptions {
+        self.snapshot = snapshot;
+        self
+    }
+
+    /// Returns stack traces of all of the threads in the calling process.
+    ///
+    /// The provided `Command` should be configured to spawn a process which will call the [`child`]
+    /// function. It must not use standard input or standard output, but standard error will be
+    /// inherited and can be used. The spawned process must "directly" call `child` rather than
+    /// spawning another process to call it. That is, the parent of the process that calls `child` is
+    /// the one that will be traced.
+    ///
+    /// [`child`]: fn.child.html
+    pub fn trace(&self, child: &mut Command) -> Result<Trace> {
+        let raw = self.trace_raw(child)?;
+        let threads = symbolicate(raw);
+        Ok(Trace { threads })
+    }
+
+    fn trace_raw(&self, child: &mut Command) -> Result<Vec<RawThread>> {
+        let _guard = TRACE_LOCK.lock();
+
+        let child = child
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|e| Error(e.into()))?;
+        let mut child = ChildGuard(child);
+
+        let mut stdin = child.0.stdin.take().unwrap();
+        let mut stdout = BufReader::new(child.0.stdout.take().unwrap());
+
+        let _guard = PtracerGuard::new(child.0.id()).map_err(|e| Error(e.into()))?;
+
+        let options = RawOptions {
+            snapshot: self.snapshot,
+        };
+        bincode::serialize_into(&mut stdin, &options).map_err(|e| Error(e.into()))?;
+
+        let raw: result::Result<Vec<RawThread>, String> =
+            bincode::deserialize_from(&mut stdout).map_err(|e| Error(e.into()))?;
+        let raw = raw.map_err(|e| Error(e.into()))?;
+
+        Ok(raw)
+    }
+}
+
+/// A convenience wrapper over `TraceOptions` which uses default options.
+// FIXME return Trace
 pub fn trace(child: &mut Command) -> Result<Vec<Thread>> {
-    let raw = trace_raw(child)?;
-    let threads = symbolicate(raw);
-    Ok(threads)
-}
-
-fn trace_raw(child: &mut Command) -> Result<Vec<RawThread>> {
-    let _guard = TRACE_LOCK.lock();
-
-    let child = child
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|e| Error(e.into()))?;
-    let mut child = ChildGuard(child);
-
-    let mut stdin = child.0.stdin.take().unwrap();
-    let mut stdout = BufReader::new(child.0.stdout.take().unwrap());
-
-    let _guard = PtracerGuard::new(child.0.id()).map_err(|e| Error(e.into()))?;
-
-    stdin.write_all(&[0]).map_err(|e| Error(e.into()))?;
-
-    let raw: result::Result<Vec<RawThread>, String> =
-        bincode::deserialize_from(&mut stdout).map_err(|e| Error(e.into()))?;
-    let raw = raw.map_err(|e| Error(e.into()))?;
-
-    Ok(raw)
+    let trace = TraceOptions::new().trace(child)?;
+    Ok(trace.threads)
 }
 
 struct ChildGuard(Child);
@@ -287,6 +330,11 @@ fn symbolicate_thread(raw: RawThread) -> Thread {
 }
 
 #[derive(Serialize, Deserialize)]
+struct RawOptions {
+    snapshot: bool,
+}
+
+#[derive(Serialize, Deserialize)]
 struct RawThread {
     id: u32,
     name: String,
@@ -299,30 +347,33 @@ struct RawFrame {
     is_signal: bool,
 }
 
-/// The function called by process spawned by a call to [`trace`].
+/// The function called by the process spawned by a call to [`trace`].
 ///
 /// [`trace`]: fn.trace.html
 pub fn child() -> Result<()> {
     let mut stdin = io::stdin();
     let mut stdout = io::stdout();
 
-    // wait for the parent to tell us it's ready
-    let mut buf = [0];
-    stdin.read_exact(&mut buf).map_err(|e| Error(e.into()))?;
+    let options = bincode::deserialize_from(&mut stdin).map_err(|e| Error(e.into()))?;
 
-    let trace = child_trace();
+    let trace = child_trace(&options);
     bincode::serialize_into(&mut stdout, &trace).map_err(|e| Error(e.into()))?;
     stdout.flush().map_err(|e| Error(e.into()))?;
 
     // wait around for the parent to kill us, or die
+    let mut buf = [0];
     let _ = stdin.read_exact(&mut buf);
     Ok(())
 }
 
-fn child_trace() -> result::Result<Vec<RawThread>, String> {
+fn child_trace(options: &RawOptions) -> result::Result<Vec<RawThread>, String> {
     let parent = unsafe { getppid() } as u32;
 
-    match rstack::TraceOptions::new().thread_names(true).trace(parent) {
+    match rstack::TraceOptions::new()
+        .thread_names(true)
+        .snapshot(options.snapshot)
+        .trace(parent)
+    {
         Ok(process) => Ok(process
             .threads()
             .iter()
