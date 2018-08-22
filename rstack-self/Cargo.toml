@@ -1,6 +1,6 @@
 [package]
 name = "rstack-self"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "Stack traces of all threads of a process"
 license = "MIT/Apache-2.0"
@@ -18,7 +18,7 @@ serde = "1.0"
 serde_derive = "1.0"
 bincode = "1.0"
 
-rstack = { version = "0.1.1", path = "../rstack" }
+rstack = { version = "0.1.2", path = "../rstack" }
 
 [dev-dependencies]
 env_logger = "0.5"
