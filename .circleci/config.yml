@@ -25,7 +25,7 @@ job: &JOB
   steps:
     - checkout
     - run: apt-get update
-    - run: apt-get install -y libunwind-dev
+    - run: apt-get install -y libunwind-dev libdw-dev
     - *RESTORE_REGISTRY
     - run: cargo generate-lockfile
     - *SAVE_REGISTRY
@@ -33,7 +33,7 @@ job: &JOB
     - *RESTORE_DEPS
     - run: cargo test
     - run: cargo test --manifest-path unwind/Cargo.toml --all-features
-    - run: cargo run --manifest-path systest/Cargo.toml --all-features
+    - run: cargo run --manifest-path unwind-systest/Cargo.toml --all-features
     - *SAVE_DEPS
 
 version: 2

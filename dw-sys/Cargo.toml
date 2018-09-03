@@ -1,0 +1,11 @@
+[package]
+name = "dw-sys"
+version = "0.1.0"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+links = "dw"
+
+[build-dependencies]
+pkg-config = "0.3"
+
+[dependencies]
+libc = "0.2"

@@ -1,9 +1,14 @@
 [workspace]
 members = [
-    "systest",
+    "dw-sys",
+    "dw-systest",
     "rstack",
     "rstack-self",
     "symbolize",
     "unwind",
     "unwind-sys",
+    "unwind-systest",
 ]
+
+[patch.crates-io]
+libc = { git = "https://github.com/sfackler/libc", branch = "more-elf" }
