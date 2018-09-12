@@ -22,7 +22,7 @@ fn main() {
     }
 
     cfg.header("libunwind.h")
-        .type_name(|t, _| t.to_string())
+        .type_name(|t, _, _| t.to_string())
         .skip_signededness(|t| match t {
             "unw_tdep_fpreg_t" | "unw_tdep_context_t" | "unw_context_t" | "unw_addr_space_t" => {
                 true
