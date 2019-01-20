@@ -84,6 +84,7 @@ impl error::Error for Error {
         error::Error::description(&*self.0)
     }
 
+    #[allow(deprecated)]
     fn cause(&self) -> Option<&error::Error> {
         error::Error::cause(&*self.0)
     }
@@ -388,8 +389,10 @@ fn child_trace(options: &RawOptions) -> result::Result<Vec<RawThread>, String> {
                     .map(|f| RawFrame {
                         ip: f.ip(),
                         is_signal: f.is_signal().unwrap_or(false),
-                    }).collect(),
-            }).collect()),
+                    })
+                    .collect(),
+            })
+            .collect()),
         Err(e) => Err(e.to_string()),
     }
 }
