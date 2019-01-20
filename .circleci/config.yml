@@ -1,55 +1,41 @@
-restore_registry: &RESTORE_REGISTRY
-  restore_cache:
-    key: registry
-save_registry: &SAVE_REGISTRY
-  save_cache:
-    key: registry-{{ .BuildNum }}
-    paths:
-    - /usr/local/cargo/registry/index
-deps_key: &DEPS_KEY
-  key: deps-{{ checksum "~/rust-version" }}-{{ checksum "Cargo.lock" }}
-restore_deps: &RESTORE_DEPS
-  restore_cache:
-    <<: *DEPS_KEY
-save_deps: &SAVE_DEPS
-  save_cache:
-    <<: *DEPS_KEY
-    paths:
-    - target
-    - /usr/local/cargo/registry/cache
+version: 2.1
 
-job: &JOB
-  working_directory: ~/build
-  environment:
-    RUSTFLAGS: -D warnings
-  steps:
-    - checkout
-    - run: apt-get update
-    - run: apt-get install -y libunwind-dev libdw-dev
-    - *RESTORE_REGISTRY
-    - run: cargo generate-lockfile
-    - *SAVE_REGISTRY
-    - run: rustc --version > ~/rust-version
-    - *RESTORE_DEPS
-    - run: cargo test
-    - run: cargo test --manifest-path unwind/Cargo.toml --all-features
-    - run: cargo run --manifest-path unwind-systest/Cargo.toml --all-features
-    - *SAVE_DEPS
-
-version: 2
 jobs:
-  stable:
-    <<: *JOB
+  test:
+    parameters:
+      image: string
     docker:
-      - image: rust:1.21.0
-  nightly:
-    <<: *JOB
-    docker:
-      - image: rustlang/rust:nightly
+      - image: << parameters.image >>
+    environment:
+      RUSTFLAGS: -D warnings
+    steps:
+      - checkout
+      - run: apt-get update
+      - run: apt-get install -y libunwind-dev libdw-dev
+      - restore_cache:
+          key: registry
+      - run: cargo generate-lockfile
+      - save_cache:
+          key: registry-{{ .BuildNum }}
+          paths:
+            - /usr/local/cargo/registry/index
+      - restore_cache:
+          key: deps-<< parameters.image >>-{{ checksum "Cargo.lock" }}
+      - run: cargo test
+      - run: cargo test --manifest-path unwind/Cargo.toml --all-features
+      - run: cargo run --manifest-path unwind-systest/Cargo.toml --all-features
+      - run: cargo run --manifest-path dw-systest/Cargo.toml --all-features
+      - save_cache:
+          key: deps-<< parameters.image >>-{{ checksum "Cargo.lock" }}
+          paths:
+            - target
+            - /usr/local/cargo/registry/cache
 
 workflows:
   version: 2
   test:
     jobs:
-      - stable
-      - nightly
+      - test:
+          image: rust:1.30.0
+      - test:
+          image: rustlang/rust:nightly
