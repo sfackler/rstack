@@ -3,7 +3,8 @@ version: 2.1
 jobs:
   test:
     parameters:
-      image: string
+      image:
+        type: string
     docker:
       - image: << parameters.image >>
     environment:
