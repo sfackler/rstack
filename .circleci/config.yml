@@ -32,7 +32,6 @@ jobs:
             - /usr/local/cargo/registry/cache
 
 workflows:
-  version: 2
   test:
     jobs:
       - test:
