@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "dw",
     "dw-sys",
     "dw-systest",
     "rstack",

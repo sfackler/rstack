@@ -45,7 +45,7 @@ pub struct Dwfl_Callbacks {
             addr: *mut Dwarf_Addr,
         ) -> c_int,
     >,
-    debuginfo_path: *mut *mut c_char,
+    pub debuginfo_path: *mut *mut c_char,
 }
 
 #[repr(C)]
@@ -444,6 +444,8 @@ extern "C" {
     pub fn dwfl_pid(dwfl: *mut Dwfl) -> pid_t;
 
     pub fn dwfl_thread_dwfl(thread: *mut Dwfl_Thread) -> *mut Dwfl;
+
+    pub fn dwfl_thread_tid(thread: *mut Dwfl_Thread) -> pid_t;
 
     pub fn dwfl_frame_thread(state: *mut Dwfl_Frame) -> *mut Dwfl_Thread;
 
