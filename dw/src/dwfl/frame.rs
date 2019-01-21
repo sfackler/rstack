@@ -1,19 +1,19 @@
 use foreign_types::{ForeignTypeRef, Opaque};
 use std::ptr;
 
-use crate::dwfl::{DwflThreadRef, Error};
+use crate::dwfl::{ThreadRef, Error};
 
-pub struct DwflFrameRef(Opaque);
+pub struct FrameRef(Opaque);
 
-impl ForeignTypeRef for DwflFrameRef {
+impl ForeignTypeRef for FrameRef {
     type CType = dw_sys::Dwfl_Frame;
 }
 
-impl DwflFrameRef {
-    pub fn thread(&self) -> &DwflThreadRef {
+impl FrameRef {
+    pub fn thread(&self) -> &ThreadRef {
         unsafe {
             let ptr = dw_sys::dwfl_frame_thread(self.as_ptr());
-            DwflThreadRef::from_ptr(ptr)
+            ThreadRef::from_ptr(ptr)
         }
     }
 

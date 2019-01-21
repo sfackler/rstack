@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
 
-use crate::dwfl::{cvt, DwflCallbacks, DwflThreadRef, Error, ModuleRef};
+use crate::dwfl::{cvt, DwflCallbacks, ThreadRef, Error, ModuleRef};
 
 pub struct Dwfl<'a>(*mut dw_sys::Dwfl, PhantomData<&'a ()>);
 
@@ -107,7 +107,7 @@ impl<'a> DwflRef<'a> {
 
     pub fn threads<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: FnMut(&mut DwflThreadRef) -> Result<(), Error>,
+        F: FnMut(&mut ThreadRef) -> Result<(), Error>,
     {
         unsafe {
             let mut state = CallbackState {
@@ -173,10 +173,10 @@ struct CallbackState<F> {
 
 unsafe extern "C" fn threads_cb<F>(thread: *mut dw_sys::Dwfl_Thread, arg: *mut c_void) -> c_int
 where
-    F: FnMut(&mut DwflThreadRef) -> Result<(), Error>,
+    F: FnMut(&mut ThreadRef) -> Result<(), Error>,
 {
     let state = &mut *(arg as *mut CallbackState<F>);
-    let thread = DwflThreadRef::from_ptr_mut(thread);
+    let thread = ThreadRef::from_ptr_mut(thread);
 
     match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(thread))) {
         Ok(Ok(())) => dw_sys::DWARF_CB_OK,

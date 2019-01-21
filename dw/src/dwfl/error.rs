@@ -30,8 +30,11 @@ impl Error {
     fn as_str(&self) -> &str {
         unsafe {
             let s = dw_sys::dwfl_errmsg(self.0);
-            assert!(!s.is_null());
-            CStr::from_ptr(s).to_str().unwrap()
+            if s.is_null() {
+                "unknown error"
+            } else {
+                CStr::from_ptr(s).to_str().unwrap()
+            }
         }
     }
 }

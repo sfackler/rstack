@@ -3,15 +3,15 @@ use libc::{c_int, c_void};
 use std::any::Any;
 use std::panic::{self, AssertUnwindSafe};
 
-use crate::dwfl::{cvt, DwflFrameRef, DwflRef, Error};
+use crate::dwfl::{cvt, FrameRef, DwflRef, Error};
 
-pub struct DwflThreadRef(Opaque);
+pub struct ThreadRef(Opaque);
 
-impl ForeignTypeRef for DwflThreadRef {
+impl ForeignTypeRef for ThreadRef {
     type CType = dw_sys::Dwfl_Thread;
 }
 
-impl DwflThreadRef {
+impl ThreadRef {
     pub fn dwfl(&self) -> &DwflRef<'_> {
         unsafe {
             let ptr = dw_sys::dwfl_thread_dwfl(self.as_ptr());
@@ -25,7 +25,7 @@ impl DwflThreadRef {
 
     pub fn frames<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: FnMut(&mut DwflFrameRef) -> Result<(), Error>,
+        F: FnMut(&mut FrameRef) -> Result<(), Error>,
     {
         unsafe {
             let mut state = CallbackState {
@@ -59,10 +59,10 @@ struct CallbackState<F> {
 
 unsafe extern "C" fn frames_cb<F>(frame: *mut dw_sys::Dwfl_Frame, arg: *mut c_void) -> c_int
 where
-    F: FnMut(&mut DwflFrameRef) -> Result<(), Error>,
+    F: FnMut(&mut FrameRef) -> Result<(), Error>,
 {
     let state = &mut *(arg as *mut CallbackState<F>);
-    let frame = DwflFrameRef::from_ptr_mut(frame);
+    let frame = FrameRef::from_ptr_mut(frame);
 
     match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(frame))) {
         Ok(Ok(())) => dw_sys::DWARF_CB_OK,
