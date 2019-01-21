@@ -36,6 +36,6 @@ workflows:
   test:
     jobs:
       - test:
-          image: rust:1.30.0
+          image: rust:1.31.0
       - test:
           image: rustlang/rust:nightly
