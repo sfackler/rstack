@@ -1,11 +1,11 @@
 use libc::c_int;
 
-pub use callbacks::*;
-pub use dwfl::*;
-pub use dwfl_frame::*;
-pub use dwfl_thread::*;
-pub use error::*;
-pub use module::*;
+pub use self::callbacks::*;
+pub use self::dwfl::*;
+pub use self::dwfl_frame::*;
+pub use self::dwfl_thread::*;
+pub use self::error::*;
+pub use self::module::*;
 
 mod callbacks;
 mod dwfl;
