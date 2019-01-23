@@ -3,7 +3,7 @@ use libc::{c_int, c_void};
 use std::any::Any;
 use std::panic::{self, AssertUnwindSafe};
 
-use crate::dwfl::{cvt, FrameRef, DwflRef, Error};
+use crate::dwfl::{cvt, DwflRef, Error, FrameRef};
 
 pub struct ThreadRef(Opaque);
 

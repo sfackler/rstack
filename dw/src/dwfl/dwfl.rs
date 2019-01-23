@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
 
-use crate::dwfl::{cvt, DwflCallbacks, ThreadRef, Error, ModuleRef};
+use crate::dwfl::{cvt, DwflCallbacks, Error, FrameRef, ModuleRef, ThreadRef};
 
 pub struct Dwfl<'a>(*mut dw_sys::Dwfl, PhantomData<&'a ()>);
 
@@ -110,7 +110,7 @@ impl<'a> DwflRef<'a> {
         F: FnMut(&mut ThreadRef) -> Result<(), Error>,
     {
         unsafe {
-            let mut state = CallbackState {
+            let mut state = ThreadsCallbackState {
                 callback,
                 panic: None,
                 error: None,
@@ -126,6 +126,34 @@ impl<'a> DwflRef<'a> {
             }
             if let Some(error) = state.error {
                 return Err(error);
+            }
+
+            cvt(r)
+        }
+    }
+
+    pub fn thread_frames<F>(&mut self, tid: u32, callback: F) -> Result<(), Error>
+    where
+        F: FnMut(&mut FrameRef) -> Result<(), Error>,
+    {
+        unsafe {
+            let mut state = FramesCallbackState {
+                callback,
+                panic: None,
+                error: None,
+            };
+            let r = dw_sys::dwfl_getthread_frames(
+                self.as_ptr(),
+                tid as pid_t,
+                Some(frames_cb::<F>),
+                &mut state as *mut _ as *mut c_void,
+            );
+
+            if let Some(payload) = state.panic {
+                panic::resume_unwind(payload);
+            }
+            if let Some(e) = state.error {
+                return Err(e);
             }
 
             cvt(r)
@@ -165,7 +193,7 @@ impl<'a, 'b> Report<'a, 'b> {
     }
 }
 
-struct CallbackState<F> {
+struct ThreadsCallbackState<F> {
     callback: F,
     panic: Option<Box<Any + Send>>,
     error: Option<Error>,
@@ -175,10 +203,36 @@ unsafe extern "C" fn threads_cb<F>(thread: *mut dw_sys::Dwfl_Thread, arg: *mut c
 where
     F: FnMut(&mut ThreadRef) -> Result<(), Error>,
 {
-    let state = &mut *(arg as *mut CallbackState<F>);
+    let state = &mut *(arg as *mut ThreadsCallbackState<F>);
     let thread = ThreadRef::from_ptr_mut(thread);
 
     match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(thread))) {
+        Ok(Ok(())) => dw_sys::DWARF_CB_OK,
+        Ok(Err(e)) => {
+            state.error = Some(e);
+            dw_sys::DWARF_CB_ABORT
+        }
+        Err(e) => {
+            state.panic = Some(e);
+            dw_sys::DWARF_CB_ABORT
+        }
+    }
+}
+
+struct FramesCallbackState<F> {
+    callback: F,
+    panic: Option<Box<Any + Send>>,
+    error: Option<Error>,
+}
+
+unsafe extern "C" fn frames_cb<F>(frame: *mut dw_sys::Dwfl_Frame, arg: *mut c_void) -> c_int
+where
+    F: FnMut(&mut FrameRef) -> Result<(), Error>,
+{
+    let state = &mut *(arg as *mut FramesCallbackState<F>);
+    let frame = FrameRef::from_ptr_mut(frame);
+
+    match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(frame))) {
         Ok(Ok(())) => dw_sys::DWARF_CB_OK,
         Ok(Err(e)) => {
             state.error = Some(e);
