@@ -17,14 +17,14 @@ fn frame_callback(frame: &mut FrameRef) -> Result<(), Error> {
         .addr_module(ip)
         .and_then(|module| module.addr_info(ip))
     {
-        Some(info) => println!(
+        Ok(info) => println!(
             "    {:#016x} - {} ({:#016x}) + {:#x}",
             ip,
             info.name().to_string_lossy(),
             info.bias() + info.symbol().value(),
             info.offset()
         ),
-        None => println!("    {:#016x} - ????", ip),
+        Err(_) => println!("    {:#016x} - ????", ip),
     }
 
     Ok(())

@@ -3,6 +3,8 @@ use std::ffi::CStr;
 use std::mem;
 use std::ptr;
 
+use crate::dw::Die;
+use crate::dwfl::Error;
 use crate::elf::Symbol;
 
 pub struct ModuleRef(Opaque);
@@ -12,18 +14,18 @@ impl ForeignTypeRef for ModuleRef {
 }
 
 impl ModuleRef {
-    pub fn addr_name(&self, addr: u64) -> Option<&CStr> {
+    pub fn addr_name(&self, addr: u64) -> Result<&CStr, Error> {
         unsafe {
             let ptr = dw_sys::dwfl_module_addrname(self.as_ptr(), addr);
             if ptr.is_null() {
-                None
+                Err(Error::new())
             } else {
-                Some(CStr::from_ptr(ptr))
+                Ok(CStr::from_ptr(ptr))
             }
         }
     }
 
-    pub fn addr_info(&self, addr: u64) -> Option<AddrInfo<'_>> {
+    pub fn addr_info(&self, addr: u64) -> Result<AddrInfo<'_>, Error> {
         unsafe {
             let mut offset = 0;
             let mut sym = mem::zeroed::<dw_sys::GElf_Sym>();
@@ -40,14 +42,26 @@ impl ModuleRef {
             );
 
             if ptr.is_null() {
-                None
+                Err(Error::new())
             } else {
-                Some(AddrInfo {
+                Ok(AddrInfo {
                     name: CStr::from_ptr(ptr),
                     offset,
                     sym: Symbol(sym),
                     bias,
                 })
+            }
+        }
+    }
+
+    pub fn addr_die(&self, addr: u64) -> Result<(&Die<'_>, u64), Error> {
+        unsafe {
+            let mut bias = 0;
+            let ptr = dw_sys::dwfl_module_addrdie(self.as_ptr(), addr, &mut bias);
+            if ptr.is_null() {
+                Err(Error::new())
+            } else {
+                Ok((Die::from_ptr(ptr), bias))
             }
         }
     }

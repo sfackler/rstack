@@ -1,3 +1,4 @@
+pub mod dw;
 pub mod dwfl;
 pub mod elf;
 
