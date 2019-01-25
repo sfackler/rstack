@@ -1,5 +1,3 @@
-extern crate rstack;
-
 use std::env;
 use std::process;
 

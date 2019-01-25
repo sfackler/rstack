@@ -7,16 +7,12 @@
 //! [libunwind]: http://www.nongnu.org/libunwind/
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
-extern crate libc;
-extern crate unwind;
-
-#[macro_use]
-extern crate log;
 
 use libc::{
     c_void, pid_t, ptrace, waitpid, ESRCH, PTRACE_ATTACH, PTRACE_CONT, PTRACE_DETACH,
     PTRACE_INTERRUPT, PTRACE_SEIZE, SIGSTOP, WIFSTOPPED, WSTOPSIG, __WALL,
 };
+use log::debug;
 use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::error;
@@ -41,7 +37,7 @@ enum ErrorInner {
 pub struct Error(ErrorInner);
 
 impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ErrorInner::Io(ref e) => fmt::Display::fmt(e, fmt),
             ErrorInner::Unwind(ref e) => fmt::Display::fmt(e, fmt),
@@ -54,7 +50,7 @@ impl error::Error for Error {
         "rstack error"
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match self.0 {
             ErrorInner::Io(ref e) => Some(e),
             ErrorInner::Unwind(ref e) => Some(e),
@@ -340,12 +336,14 @@ fn add_threads(threads: &mut BTreeSet<TracedThread>, pid: u32) -> Result<()> {
             let thread = match TracedThread::new(tid) {
                 Ok(thread) => thread,
                 // ESRCH just means the thread died in the middle of things, which is fine
-                Err(e) => if e.raw_os_error() == Some(ESRCH) {
-                    debug!("error attaching to thread {}: {}", pid, e);
-                    return Ok(());
-                } else {
-                    return Err(Error(ErrorInner::Io(e)));
-                },
+                Err(e) => {
+                    if e.raw_os_error() == Some(ESRCH) {
+                        debug!("error attaching to thread {}: {}", pid, e);
+                        return Ok(());
+                    } else {
+                        return Err(Error(ErrorInner::Io(e)));
+                    }
+                }
             };
             threads.insert(thread);
         }
