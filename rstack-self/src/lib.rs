@@ -50,22 +50,11 @@
 //! ```
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
-extern crate antidote;
-extern crate backtrace;
-extern crate bincode;
-extern crate libc;
-extern crate rstack;
-
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate serde_derive;
-
-#[cfg(test)]
-extern crate env_logger;
 
 use antidote::Mutex;
+use lazy_static::lazy_static;
 use libc::{c_ulong, getppid, prctl, PR_SET_PTRACER};
+use serde::{Deserialize, Serialize};
 use std::error;
 use std::fmt;
 use std::io::{self, BufReader, Read, Write};
@@ -82,22 +71,17 @@ pub type Result<T> = result::Result<T, Error>;
 
 /// The error type returned by methods in this crate.
 #[derive(Debug)]
-pub struct Error(Box<error::Error + Sync + Send>);
+pub struct Error(Box<dyn error::Error + Sync + Send>);
 
 impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.0, fmt)
     }
 }
 
 impl error::Error for Error {
-    fn description(&self) -> &str {
-        error::Error::description(&*self.0)
-    }
-
-    #[allow(deprecated)]
-    fn cause(&self) -> Option<&error::Error> {
-        error::Error::cause(&*self.0)
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        error::Error::source(&*self.0)
     }
 }
 
