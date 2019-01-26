@@ -2,7 +2,7 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
-use crate::dwfl::{Dwfl, DwflCallbacks, Error, FindDebuginfo, FindElf, FrameRef};
+use crate::dwfl::{Callbacks, Dwfl, Error, FindDebuginfo, FindElf, FrameRef};
 
 fn frame_callback(frame: &mut FrameRef) -> Result<(), Error> {
     let mut activation = false;
@@ -35,7 +35,7 @@ fn trace_sleep() {
     let child = Command::new("sleep").arg("10").spawn().unwrap();
     thread::sleep(Duration::from_millis(10));
 
-    let callbacks = DwflCallbacks::new(FindElf::LINUX_PROC, FindDebuginfo::STANDARD);
+    let callbacks = Callbacks::new(FindElf::LINUX_PROC, FindDebuginfo::STANDARD);
     let mut dwfl = Dwfl::begin(&callbacks).unwrap();
     dwfl.report().linux_proc(child.id()).unwrap();
     dwfl.linux_proc_attach(child.id(), false).unwrap();
@@ -52,7 +52,7 @@ fn trace_sleep_thread() {
     let child = Command::new("sleep").arg("10").spawn().unwrap();
     thread::sleep(Duration::from_millis(10));
 
-    let callbacks = DwflCallbacks::new(FindElf::LINUX_PROC, FindDebuginfo::STANDARD);
+    let callbacks = Callbacks::new(FindElf::LINUX_PROC, FindDebuginfo::STANDARD);
     let mut dwfl = Dwfl::begin(&callbacks).unwrap();
     dwfl.report().linux_proc(child.id()).unwrap();
     dwfl.linux_proc_attach(child.id(), false).unwrap();

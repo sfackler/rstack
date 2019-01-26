@@ -8,6 +8,7 @@
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
 
+use cfg_if::cfg_if;
 use libc::{
     c_void, pid_t, ptrace, waitpid, ESRCH, PTRACE_ATTACH, PTRACE_CONT, PTRACE_DETACH,
     PTRACE_INTERRUPT, PTRACE_SEIZE, SIGSTOP, WIFSTOPPED, WSTOPSIG, __WALL,
@@ -21,7 +22,18 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::ptr;
 use std::result;
-use unwind::{Accessors, AddressSpace, Byteorder, Cursor, PTraceState, PTraceStateRef, RegNum};
+
+cfg_if! {
+    if #[cfg(feature = "dw")] {
+        #[path = "imp/dw.rs"]
+        mod imp;
+    } else if #[cfg(feature = "unwind")] {
+        #[path = "imp/unwind.rs"]
+        mod imp;
+    } else {
+        compile_error!("You must select an unwinding implementation");
+    }
+}
 
 /// The result type returned by methods in this crate.
 pub type Result<T> = result::Result<T, Error>;
@@ -29,7 +41,7 @@ pub type Result<T> = result::Result<T, Error>;
 #[derive(Debug)]
 enum ErrorInner {
     Io(io::Error),
-    Unwind(unwind::Error),
+    Unwind(imp::Error),
 }
 
 /// The error type returned by methods in this crate.
@@ -261,39 +273,28 @@ impl TraceOptions {
 
     /// Traces the threads of the specified process.
     pub fn trace(&self, pid: u32) -> Result<Process> {
-        let space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT)
-            .map_err(|e| Error(ErrorInner::Unwind(e)))?;
+        let mut state = imp::State::new(pid).map_err(|e| Error(ErrorInner::Unwind(e)))?;
 
         let threads = if self.snapshot {
-            self.trace_snapshot(pid, &space)?
+            self.trace_snapshot(pid, &mut state)?
         } else {
-            self.trace_rolling(pid, &space)?
+            self.trace_rolling(pid, &mut state)?
         };
 
         Ok(Process { id: pid, threads })
     }
 
-    fn trace_snapshot(
-        &self,
-        pid: u32,
-        space: &AddressSpace<PTraceStateRef>,
-    ) -> Result<Vec<Thread>> {
-        let threads = snapshot_threads(pid)?;
+    fn trace_snapshot(&self, pid: u32, state: &mut imp::State) -> Result<Vec<Thread>> {
+        let threads = snapshot_threads(pid)?
+            .iter()
+            .map(|t| t.info(pid, state, self))
+            .collect();
 
-        let mut traces = vec![];
-
-        for thread in &threads {
-            match thread.info(pid, space, self) {
-                Ok(thread) => traces.push(thread),
-                Err(e) => debug!("error tracing thread {}: {}", thread.0, e),
-            }
-        }
-
-        Ok(traces)
+        Ok(threads)
     }
 
-    fn trace_rolling(&self, pid: u32, space: &AddressSpace<PTraceStateRef>) -> Result<Vec<Thread>> {
-        let mut traces = vec![];
+    fn trace_rolling(&self, pid: u32, state: &mut imp::State) -> Result<Vec<Thread>> {
+        let mut threads = vec![];
 
         each_thread(pid, |tid| {
             let thread = match TracedThread::new(tid) {
@@ -305,12 +306,12 @@ impl TraceOptions {
                 Err(e) => return Err(Error(ErrorInner::Io(e))),
             };
 
-            let trace = thread.info(pid, space, self)?;
-            traces.push(trace);
+            let trace = thread.info(pid, state, self);
+            threads.push(trace);
             Ok(())
         })?;
 
-        Ok(traces)
+        Ok(threads)
     }
 }
 
@@ -494,72 +495,30 @@ impl TracedThread {
         }
     }
 
-    fn info(
-        &self,
-        pid: u32,
-        space: &AddressSpace<PTraceStateRef>,
-        options: &TraceOptions,
-    ) -> Result<Thread> {
+    fn info(&self, pid: u32, state: &mut imp::State, options: &TraceOptions) -> Thread {
         let name = if options.thread_names {
             self.name(pid)
         } else {
             None
         };
 
-        match self.dump(&space, options) {
-            Ok(frames) => Ok(Thread {
-                id: self.0,
-                name,
-                frames,
-            }),
-            Err(e) => Err(Error(ErrorInner::Unwind(e))),
+        let frames = self.dump(state, options);
+
+        Thread {
+            id: self.0,
+            name,
+            frames,
         }
     }
 
-    fn dump(
-        &self,
-        space: &AddressSpace<PTraceStateRef>,
-        options: &TraceOptions,
-    ) -> unwind::Result<Vec<Frame>> {
-        let state = PTraceState::new(self.0)?;
-        let mut cursor = Cursor::remote(&space, &state)?;
+    fn dump(&self, state: &mut imp::State, options: &TraceOptions) -> Vec<Frame> {
+        let mut frames = vec![];
 
-        let mut trace = vec![];
-        loop {
-            let ip = cursor.register(RegNum::IP)? as usize;
-            let is_signal = cursor.is_signal_frame().ok();
-
-            let name = if options.procedure_names {
-                cursor.procedure_name().ok().map(|n| ProcedureName {
-                    name: n.name().to_string(),
-                    offset: n.offset() as usize,
-                })
-            } else {
-                None
-            };
-
-            let info = if options.procedure_info {
-                cursor.procedure_info().ok().map(|i| ProcedureInfo {
-                    start_ip: i.start_ip() as usize,
-                    end_ip: i.end_ip() as usize,
-                })
-            } else {
-                None
-            };
-
-            trace.push(Frame {
-                ip,
-                is_signal,
-                name,
-                info,
-            });
-
-            if !cursor.step()? {
-                break;
-            }
+        if let Err(e) = self.dump_inner(state, options, &mut frames) {
+            debug!("error tracing thread {}: {}", self.0, e);
         }
 
-        Ok(trace)
+        frames
     }
 
     fn name(&self, pid: u32) -> Option<String> {

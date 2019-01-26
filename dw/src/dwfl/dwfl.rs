@@ -8,7 +8,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
 
 use crate::dw::Die;
-use crate::dwfl::{cvt, DwflCallbacks, Error, FrameRef, ModuleRef, ThreadRef};
+use crate::dwfl::{cvt, Callbacks, Error, FrameRef, ModuleRef, ThreadRef};
 
 pub struct Dwfl<'a>(*mut dw_sys::Dwfl, PhantomData<&'a ()>);
 
@@ -52,7 +52,7 @@ impl<'a> DerefMut for Dwfl<'a> {
 }
 
 impl<'a> Dwfl<'a> {
-    pub fn begin(callbacks: &'a DwflCallbacks) -> Result<Dwfl<'a>, Error> {
+    pub fn begin(callbacks: &'a Callbacks) -> Result<Dwfl<'a>, Error> {
         unsafe {
             let ptr = dw_sys::dwfl_begin(callbacks.as_ptr());
             if ptr.is_null() {

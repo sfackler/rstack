@@ -1,11 +1,14 @@
 use libc::{c_char, c_int, c_void};
 use std::ptr;
 
-pub struct DwflCallbacks(dw_sys::Dwfl_Callbacks);
+pub struct Callbacks(dw_sys::Dwfl_Callbacks);
 
-impl DwflCallbacks {
-    pub fn new(find_elf: FindElf, find_debuginfo: FindDebuginfo) -> DwflCallbacks {
-        DwflCallbacks(dw_sys::Dwfl_Callbacks {
+unsafe impl Sync for Callbacks {}
+unsafe impl Send for Callbacks {}
+
+impl Callbacks {
+    pub fn new(find_elf: FindElf, find_debuginfo: FindDebuginfo) -> Callbacks {
+        Callbacks(dw_sys::Dwfl_Callbacks {
             find_elf: Some(find_elf.0),
             find_debuginfo: Some(find_debuginfo.0),
             section_address: None,

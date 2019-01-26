@@ -10,8 +10,16 @@ documentation = "https://sfackler.github.io/rstack/doc/rstack"
 categories = ["api-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
+[features]
+default = ["unwind"]
+unwind = ["unwind_"]
+dw = ["dw_", "lazy_static"]
+
 [dependencies]
+cfg-if = "0.1"
+lazy_static = { version = "1.0", optional = true }
 libc = "0.2"
 log = "0.4"
 
-unwind = { version = "0.2", path = "../unwind", features = ["ptrace"] }
+unwind_ = { package = "unwind", version = "0.2", path = "../unwind", features = ["ptrace"], optional = true }
+dw_ = { package = "dw", version = "0.1", path = "../dw", optional = true }
