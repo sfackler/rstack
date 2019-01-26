@@ -1,10 +1,21 @@
 //! Thread stack traces of remote processes.
 //!
-//! `rstack` (named after Java's `jstack`) uses [libunwind]'s ptrace interface to capture stack
-//! traces of the threads of a remote process. It currently only supports Linux, and requires
-//! that the `/proc` pseudo-filesystem be mounted and accessible.
+//! `rstack` (named after Java's `jstack`) uses ptrace to capture stack traces of the threads of a remote process. It
+//! currently only supports Linux, and requires that the `/proc` pseudo-filesystem be mounted and accessible. Multiple
+//! unwinding implementations are supported via Cargo features:
+//!
+//! * `unwind`: Uses [libunwind].
+//! * `dw`: Uses libdw, part of the [elfutils] project.
+//!
+//! By default, the libunwind backend is used. You can switch to libdw via Cargo:
+//!
+//! ```toml
+//! [dependencies]
+//! rstack = { version = "0.1", features = ["dw"], default-features = false }
+//! ```
 //!
 //! [libunwind]: http://www.nongnu.org/libunwind/
+//! [elfutils]: https://sourceware.org/elfutils/
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
 

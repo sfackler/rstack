@@ -1,11 +1,22 @@
 //! Retrieve stack traces of all threads of the process.
 //!
-//! This is implemented using the [rstack] crate, which itself uses [libunwind]'s ability to
-//! trace remote processes using ptrace. Because processes cannot ptrace themselves, we're forced to
-//! use spawn a child process which does that work.
+//! This is implemented using the [rstack] crate, which itself uses ptrace to unwind the threads of the process.
+//! Because processes cannot ptrace themselves, we're forced to use spawn a child process which does that work. Multiple
+//! unwinding implementations are supported via Cargo features:
+//!
+//! * `unwind`: Uses [libunwind].
+//! * `dw`: Uses libdw, part of the [elfutils] project.
+//!
+//! By default, the libunwind backend is used. You can switch to libdw via Cargo:
+//!
+//! ```toml
+//! [dependencies]
+//! rstack-self = { version = "0.1", features = ["dw"], default-features = false }
+//! ```
 //!
 //! [rstack]: https://sfackler.github.io/rstack/doc/rstack
 //! [libunwind]: http://www.nongnu.org/libunwind/
+//! [elfutils]: https://sourceware.org/elfutils/
 //!
 //! # Example
 //!
