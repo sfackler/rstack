@@ -1,12 +1,10 @@
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![allow(bad_style, improper_ctypes)] // x86_64 libunwind has empty structs before 1.2
-extern crate libc;
-
 use libc::{c_char, c_int, c_void, size_t};
 
-pub use native::*;
+pub use crate::native::*;
 #[cfg(feature = "ptrace")]
-pub use ptrace::*;
+pub use crate::ptrace::*;
 
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 mod native;
@@ -80,12 +78,18 @@ pub struct unw_accessors_t {
         ) -> c_int,
     >,
     pub put_unwind_info: Option<
-        unsafe extern "C" fn(asp: unw_addr_space_t, pip: *mut unw_proc_info_t, arg: *mut c_void)
-            -> c_void,
+        unsafe extern "C" fn(
+            asp: unw_addr_space_t,
+            pip: *mut unw_proc_info_t,
+            arg: *mut c_void,
+        ) -> c_void,
     >,
     pub get_dyn_info_list_addr: Option<
-        unsafe extern "C" fn(asp: unw_addr_space_t, dilap: *mut unw_word_t, arg: *mut c_void)
-            -> c_int,
+        unsafe extern "C" fn(
+            asp: unw_addr_space_t,
+            dilap: *mut unw_word_t,
+            arg: *mut c_void,
+        ) -> c_int,
     >,
     pub access_mem: Option<
         unsafe extern "C" fn(
@@ -108,8 +112,11 @@ pub struct unw_accessors_t {
     // unw_fpreg_t is a long double :(
     access_fpreg: Option<unsafe extern "C" fn()>,
     pub resume: Option<
-        unsafe extern "C" fn(asp: unw_addr_space_t, cp: *mut unw_cursor_t, arg: *mut c_void)
-            -> c_int,
+        unsafe extern "C" fn(
+            asp: unw_addr_space_t,
+            cp: *mut unw_cursor_t,
+            arg: *mut c_void,
+        ) -> c_int,
     >,
     pub get_proc_name: Option<
         unsafe extern "C" fn(

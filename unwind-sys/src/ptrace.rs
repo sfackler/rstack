@@ -1,6 +1,6 @@
 use libc::{c_void, pid_t};
 
-use ::*;
+use crate::*;
 
 extern "C" {
     pub fn _UPT_create(pid: pid_t) -> *mut c_void;
