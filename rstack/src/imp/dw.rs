@@ -44,21 +44,21 @@ impl TracedThread {
                     if options.procedure_names {
                         name = Some(ProcedureName {
                             name: i.name().to_string_lossy().into_owned(),
-                            offset: (i.offset() + signal_adjust) as usize,
+                            offset: i.offset() + signal_adjust,
                         });
                     }
                     if options.procedure_info {
-                        let start_ip = (i.bias() + i.symbol().value()) as usize;
+                        let start_ip = i.bias() + i.symbol().value();
                         info = Some(ProcedureInfo {
                             start_ip,
-                            end_ip: start_ip + i.symbol().size() as usize,
+                            end_ip: start_ip + i.symbol().size(),
                         });
                     }
                 }
             }
 
             frames.push(Frame {
-                ip: ip as usize,
+                ip,
                 is_signal: Some(is_signal),
                 name,
                 info,

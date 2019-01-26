@@ -382,7 +382,7 @@ fn child_trace(options: &RawOptions) -> result::Result<Vec<RawThread>, String> {
                     .frames()
                     .iter()
                     .map(|f| RawFrame {
-                        ip: f.ip(),
+                        ip: f.ip() as usize,
                         is_signal: f.is_signal().unwrap_or(false),
                     })
                     .collect(),

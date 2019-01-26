@@ -22,13 +22,13 @@ impl TracedThread {
         let mut cursor = Cursor::remote(&space.0, &state)?;
 
         loop {
-            let ip = cursor.register(RegNum::IP)? as usize;
+            let ip = cursor.register(RegNum::IP)?;
             let is_signal = cursor.is_signal_frame().ok();
 
             let name = if options.procedure_names {
                 cursor.procedure_name().ok().map(|n| ProcedureName {
                     name: n.name().to_string(),
-                    offset: n.offset() as usize,
+                    offset: n.offset(),
                 })
             } else {
                 None
@@ -36,8 +36,8 @@ impl TracedThread {
 
             let info = if options.procedure_info {
                 cursor.procedure_info().ok().map(|i| ProcedureInfo {
-                    start_ip: i.start_ip() as usize,
-                    end_ip: i.end_ip() as usize,
+                    start_ip: i.start_ip(),
+                    end_ip: i.end_ip(),
                 })
             } else {
                 None

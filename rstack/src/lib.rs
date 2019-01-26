@@ -69,10 +69,6 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn description(&self) -> &str {
-        "rstack error"
-    }
-
     fn cause(&self) -> Option<&dyn error::Error> {
         match self.0 {
             ErrorInner::Io(ref e) => Some(e),
@@ -131,7 +127,7 @@ impl Thread {
 /// Information about a stack frame of a remote process.
 #[derive(Debug, Clone)]
 pub struct Frame {
-    ip: usize,
+    ip: u64,
     is_signal: Option<bool>,
     name: Option<ProcedureName>,
     info: Option<ProcedureInfo>,
@@ -140,7 +136,7 @@ pub struct Frame {
 impl Frame {
     /// Returns the instruction pointer of the frame.
     #[inline]
-    pub fn ip(&self) -> usize {
+    pub fn ip(&self) -> u64 {
         self.ip
     }
 
@@ -172,7 +168,7 @@ impl Frame {
 #[derive(Debug, Clone)]
 pub struct ProcedureName {
     name: String,
-    offset: usize,
+    offset: u64,
 }
 
 impl ProcedureName {
@@ -184,7 +180,7 @@ impl ProcedureName {
 
     /// Returns the offset of the instruction pointer from this procedure's starting address.
     #[inline]
-    pub fn offset(&self) -> usize {
+    pub fn offset(&self) -> u64 {
         self.offset
     }
 }
@@ -192,20 +188,20 @@ impl ProcedureName {
 /// Information about a procedure.
 #[derive(Debug, Clone)]
 pub struct ProcedureInfo {
-    start_ip: usize,
-    end_ip: usize,
+    start_ip: u64,
+    end_ip: u64,
 }
 
 impl ProcedureInfo {
     /// Returns the starting address of this procedure.
     #[inline]
-    pub fn start_ip(&self) -> usize {
+    pub fn start_ip(&self) -> u64 {
         self.start_ip
     }
 
     /// Returns the ending address of this procedure.
     #[inline]
-    pub fn end_ip(&self) -> usize {
+    pub fn end_ip(&self) -> u64 {
         self.end_ip
     }
 }
