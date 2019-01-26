@@ -29,11 +29,12 @@ impl TracedThread {
         dwfl.0.thread_frames(self.0, |frame| {
             let mut is_signal = false;
             let ip = frame.pc(Some(&mut is_signal))?;
-            let signal_adjust = if is_signal { 0 } else { 1 };
 
             let mut name = None;
             let mut info = None;
             if options.procedure_names || options.procedure_info {
+                let signal_adjust = if is_signal { 0 } else { 1 };
+
                 if let Ok(i) = frame
                     .thread()
                     .dwfl()

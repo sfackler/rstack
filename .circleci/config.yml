@@ -23,6 +23,7 @@ jobs:
       - restore_cache:
           key: deps-<< parameters.image >>-{{ checksum "Cargo.lock" }}
       - run: cargo test
+      - run: cargo test --manifest-path rstack/Cargo.toml --no-default-features --features dw
       - run: cargo test --manifest-path unwind/Cargo.toml --all-features
       - run: cargo run --manifest-path unwind-systest/Cargo.toml --all-features
       - run: cargo run --manifest-path dw-systest/Cargo.toml --all-features
