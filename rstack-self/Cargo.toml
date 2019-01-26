@@ -9,6 +9,11 @@ documentation = "https://sfackler.github.io/rstack/doc/rstack_self"
 categories = ["api-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
+[features]
+default = ["unwind"]
+unwind = ["rstack/unwind"]
+dw = ["rstack/dw"]
+
 [dependencies]
 antidote = "1.0"
 backtrace = "0.3"
@@ -18,7 +23,7 @@ serde = "1.0"
 serde_derive = "1.0"
 bincode = "1.0"
 
-rstack = { version = "0.1.2", path = "../rstack" }
+rstack = { version = "0.1.2", path = "../rstack", default-features = false }
 
 [dev-dependencies]
 env_logger = "0.5"
