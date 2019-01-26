@@ -2,6 +2,7 @@
 name = "unwind"
 version = "0.2.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
+edition = "2018"
 description = "An interface to libunwind"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/sfackler/rstack"

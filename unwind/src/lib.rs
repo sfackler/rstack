@@ -39,22 +39,16 @@
 //! [libunwind]: http://www.nongnu.org/libunwind/
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
-extern crate libc;
-extern crate unwind_sys;
 
-#[macro_use]
-#[allow(unused_imports)]
-extern crate foreign_types;
-
-use foreign_types::Opaque;
+use foreign_types::{foreign_type, Opaque};
 use libc::{c_char, c_int, c_void};
+use std::error;
 use std::ffi::CStr;
 use std::fmt;
-use std::error;
-use std::mem;
-use std::result;
 use std::marker::PhantomData;
+use std::mem;
 use std::ops::{Deref, DerefMut};
+use std::result;
 use unwind_sys::*;
 
 /// The result type returned by functions in this crate.
@@ -97,7 +91,7 @@ impl Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
             let err = unw_strerror(self.0);
             let err = CStr::from_ptr(err).to_string_lossy();
@@ -106,11 +100,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        "libunwind error"
-    }
-}
+impl error::Error for Error {}
 
 /// The byteorder of an address space.
 #[derive(Copy, Clone)]
@@ -293,10 +283,10 @@ impl<'a> Cursor<'a> {
     /// Creates a cursor over the stack of the calling thread.
     ///
     /// The cursor is provided to a closure rather than being returned because the stack frame being
-    /// referenced by the frame must remain alive.
+    /// referenced by the cursor must remain alive.
     pub fn local<F, T>(f: F) -> Result<T>
     where
-        F: FnOnce(Cursor) -> Result<T>,
+        F: FnOnce(Cursor<'_>) -> Result<T>,
     {
         unsafe {
             let mut context = mem::uninitialized();
@@ -435,10 +425,7 @@ impl<'a> Cursor<'a> {
                     let len = buf.iter().position(|b| *b == 0).unwrap();
                     buf.truncate(len);
                     let name = String::from_utf8_lossy(&buf).into_owned();
-                    return Ok(ProcedureName {
-                        name,
-                        offset,
-                    });
+                    return Ok(ProcedureName { name, offset });
                 }
                 Err(Error::NOMEM) => {
                     let len = buf.len() * 2;
@@ -481,10 +468,7 @@ mod test {
                         (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
                             println!(
                                 "{:#016x} - {} ({:#016x}) + {:#x}",
-                                ip,
-                                name.name,
-                                info.start_ip,
-                                name.offset
+                                ip, name.name, info.start_ip, name.offset
                             );
                         }
                         _ => {
@@ -498,7 +482,8 @@ mod test {
                 }
 
                 Ok(())
-            }).unwrap();
+            })
+            .unwrap();
         }
         fn foo() {
             bar();
@@ -509,8 +494,8 @@ mod test {
     #[test]
     #[cfg(feature = "ptrace")]
     fn remote() {
-        use std::process::Command;
         use std::io;
+        use std::process::Command;
         use std::ptr;
 
         let mut child = Command::new("sleep").arg("10").spawn().unwrap();
@@ -547,10 +532,7 @@ mod test {
                 (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
                     println!(
                         "{:#016x} - {} ({:#016x}) + {:#x}",
-                        ip,
-                        name.name,
-                        info.start_ip,
-                        name.offset
+                        ip, name.name, info.start_ip, name.offset
                     );
                 }
                 _ => println!("{:#016x} - ????", ip),
