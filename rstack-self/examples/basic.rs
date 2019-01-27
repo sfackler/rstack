@@ -23,7 +23,7 @@ fn main() {
     let exe = env::current_exe().unwrap();
     let trace = rstack_self::trace(Command::new(exe).arg("child")).unwrap();
 
-    for thread in trace {
+    for thread in trace.threads() {
         println!("{} - {}", thread.id(), thread.name());
         for frame in thread.frames() {
             println!("{:#016x}", frame.ip());

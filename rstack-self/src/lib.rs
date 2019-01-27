@@ -243,10 +243,8 @@ impl TraceOptions {
 }
 
 /// A convenience wrapper over `TraceOptions` which uses default options.
-// FIXME return Trace
-pub fn trace(child: &mut Command) -> Result<Vec<Thread>> {
-    let trace = TraceOptions::new().trace(child)?;
-    Ok(trace.threads)
+pub fn trace(child: &mut Command) -> Result<Trace> {
+    TraceOptions::new().trace(child)
 }
 
 struct ChildGuard(Child);
