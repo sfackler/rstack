@@ -7,7 +7,6 @@ use std::ops::{Deref, DerefMut};
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
 
-use crate::dw::Die;
 use crate::dwfl::{cvt, Callbacks, Error, FrameRef, ModuleRef, ThreadRef};
 
 pub struct Dwfl<'a>(*mut dw_sys::Dwfl, PhantomData<&'a ()>);
@@ -168,18 +167,6 @@ impl<'a> DwflRef<'a> {
                 Err(Error::new())
             } else {
                 Ok(ModuleRef::from_ptr(ptr))
-            }
-        }
-    }
-
-    pub fn addr_die(&self, address: u64) -> Result<(&Die<'_>, u64), Error> {
-        unsafe {
-            let mut bias = 0;
-            let ptr = dw_sys::dwfl_addrdie(self.as_ptr(), address, &mut bias);
-            if ptr.is_null() {
-                Err(Error::new())
-            } else {
-                Ok((Die::from_ptr(ptr), bias))
             }
         }
     }

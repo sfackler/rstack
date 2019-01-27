@@ -3,7 +3,6 @@ use std::ffi::CStr;
 use std::mem;
 use std::ptr;
 
-use crate::dw::Die;
 use crate::dwfl::Error;
 use crate::elf::Symbol;
 
@@ -50,18 +49,6 @@ impl ModuleRef {
                     sym: Symbol(sym),
                     bias,
                 })
-            }
-        }
-    }
-
-    pub fn addr_die(&self, addr: u64) -> Result<(&Die<'_>, u64), Error> {
-        unsafe {
-            let mut bias = 0;
-            let ptr = dw_sys::dwfl_module_addrdie(self.as_ptr(), addr, &mut bias);
-            if ptr.is_null() {
-                Err(Error::new())
-            } else {
-                Ok((Die::from_ptr(ptr), bias))
             }
         }
     }
