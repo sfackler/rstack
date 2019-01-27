@@ -177,7 +177,7 @@ pub struct TraceOptions {
 
 impl Default for TraceOptions {
     fn default() -> TraceOptions {
-        TraceOptions { snapshot: true }
+        TraceOptions { snapshot: false }
     }
 }
 
@@ -192,7 +192,7 @@ impl TraceOptions {
     /// A snapshot-mode trace ensures a consistent view of all threads, but requires that all
     /// threads be paused for the entire duration of the trace.
     ///
-    /// Defaults to `true`.
+    /// Defaults to `false`.
     pub fn snapshot(&mut self, snapshot: bool) -> &mut TraceOptions {
         self.snapshot = snapshot;
         self
