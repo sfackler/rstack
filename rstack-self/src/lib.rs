@@ -302,7 +302,7 @@ fn symbolicate_thread(raw: RawThread) -> Thread {
 
     for raw_frame in raw.frames {
         let mut frame = Frame {
-            ip: raw_frame.ip,
+            ip: raw_frame.ip as usize,
             symbols: vec![],
         };
 
@@ -339,7 +339,7 @@ struct RawThread {
 
 #[derive(Serialize, Deserialize)]
 struct RawFrame {
-    ip: usize,
+    ip: u64,
     is_signal: bool,
 }
 
@@ -382,8 +382,8 @@ fn child_trace(options: &RawOptions) -> result::Result<Vec<RawThread>, String> {
                     .frames()
                     .iter()
                     .map(|f| RawFrame {
-                        ip: f.ip() as usize,
-                        is_signal: f.is_signal().unwrap_or(false),
+                        ip: f.ip(),
+                        is_signal: f.is_signal(),
                     })
                     .collect(),
             })

@@ -128,9 +128,8 @@ impl Thread {
 #[derive(Debug, Clone)]
 pub struct Frame {
     ip: u64,
-    is_signal: Option<bool>,
-    name: Option<ProcedureName>,
-    info: Option<ProcedureInfo>,
+    is_signal: bool,
+    symbol: Option<Symbol>,
 }
 
 impl Frame {
@@ -140,69 +139,51 @@ impl Frame {
         self.ip
     }
 
-    /// Determines if the frame is from a signal handler, if known.
+    /// Determines if the frame is from a signal handler.
     #[inline]
-    pub fn is_signal(&self) -> Option<bool> {
+    pub fn is_signal(&self) -> bool {
         self.is_signal
     }
 
-    /// Returns the name of the procedure that this frame is running, if known.
-    ///
-    /// In certain contexts, particularly when the binary being traced or its dynamic libraries have
-    /// been stripped, the unwinder may not have enough information to properly identify the
-    /// procedure and will simply return the first label before the frame's instruction pointer. The
-    /// offset will always be relative to this label.
+    /// Returns information about the symbol corresponding to this frame's instruction pointer, if known.
     #[inline]
-    pub fn name(&self) -> Option<&ProcedureName> {
-        self.name.as_ref()
-    }
-
-    /// Returns information about the procedure that this frame is running, if known.
-    #[inline]
-    pub fn info(&self) -> Option<&ProcedureInfo> {
-        self.info.as_ref()
+    pub fn symbol(&self) -> Option<&Symbol> {
+        self.symbol.as_ref()
     }
 }
 
-/// Information about a name of a procedure.
+/// Information about the symbol corresponding to a stack frame.
 #[derive(Debug, Clone)]
-pub struct ProcedureName {
+pub struct Symbol {
     name: String,
     offset: u64,
+    address: u64,
+    size: u64,
 }
 
-impl ProcedureName {
+impl Symbol {
     /// Returns the name of the procedure.
     #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// Returns the offset of the instruction pointer from this procedure's starting address.
+    /// Returns the offset of the instruction pointer from the symbol's starting address.
     #[inline]
     pub fn offset(&self) -> u64 {
         self.offset
     }
-}
 
-/// Information about a procedure.
-#[derive(Debug, Clone)]
-pub struct ProcedureInfo {
-    start_ip: u64,
-    end_ip: u64,
-}
-
-impl ProcedureInfo {
-    /// Returns the starting address of this procedure.
+    /// Returns the starting address of the symbol.
     #[inline]
-    pub fn start_ip(&self) -> u64 {
-        self.start_ip
+    pub fn address(&self) -> u64 {
+        self.address
     }
 
-    /// Returns the ending address of this procedure.
+    /// Returns the size of the symbol.
     #[inline]
-    pub fn end_ip(&self) -> u64 {
-        self.end_ip
+    pub fn size(&self) -> u64 {
+        self.size
     }
 }
 
@@ -210,8 +191,7 @@ impl ProcedureInfo {
 pub fn trace(pid: u32) -> Result<Process> {
     TraceOptions::new()
         .thread_names(true)
-        .procedure_names(true)
-        .procedure_info(true)
+        .symbols(true)
         .trace(pid)
 }
 
@@ -220,17 +200,15 @@ pub fn trace(pid: u32) -> Result<Process> {
 pub struct TraceOptions {
     snapshot: bool,
     thread_names: bool,
-    procedure_names: bool,
-    procedure_info: bool,
+    symbols: bool,
 }
 
 impl Default for TraceOptions {
     fn default() -> TraceOptions {
         TraceOptions {
-            snapshot: true,
+            snapshot: false,
             thread_names: false,
-            procedure_names: false,
-            procedure_info: false,
+            symbols: false,
         }
     }
 }
@@ -246,7 +224,7 @@ impl TraceOptions {
     /// A snapshot-mode trace ensures a consistent view of all threads, but requires that all
     /// threads be paused for the entire duration of the trace.
     ///
-    /// Defaults to `true`.
+    /// Defaults to `false`.
     pub fn snapshot(&mut self, snapshot: bool) -> &mut TraceOptions {
         self.snapshot = snapshot;
         self
@@ -260,21 +238,11 @@ impl TraceOptions {
         self
     }
 
-    /// If set, the names of the procedures running in the frames of the process's threads will be
-    /// recorded.
+    /// If set, information about the symbol at each frame will be recorded.
     ///
     /// Defaults to `false`.
-    pub fn procedure_names(&mut self, procedure_names: bool) -> &mut TraceOptions {
-        self.procedure_names = procedure_names;
-        self
-    }
-
-    /// If set, information about the procedures running in the frames of the process's threads will
-    /// be recorded.
-    ///
-    /// Defaults to `false`.
-    pub fn procedure_info(&mut self, procedure_info: bool) -> &mut TraceOptions {
-        self.procedure_info = procedure_info;
+    pub fn symbols(&mut self, symbols: bool) -> &mut TraceOptions {
+        self.symbols = symbols;
         self
     }
 

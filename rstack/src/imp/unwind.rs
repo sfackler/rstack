@@ -1,7 +1,7 @@
 pub use unwind_::Error;
 use unwind_::{Accessors, AddressSpace, Byteorder, Cursor, PTraceState, PTraceStateRef, RegNum};
 
-use crate::{Frame, ProcedureInfo, ProcedureName, TraceOptions, TracedThread};
+use crate::{Frame, Symbol, TraceOptions, TracedThread};
 
 pub struct State(AddressSpace<PTraceStateRef>);
 
@@ -23,31 +23,27 @@ impl TracedThread {
 
         loop {
             let ip = cursor.register(RegNum::IP)?;
-            let is_signal = cursor.is_signal_frame().ok();
+            let is_signal = cursor.is_signal_frame()?;
 
-            let name = if options.procedure_names {
-                cursor.procedure_name().ok().map(|n| ProcedureName {
-                    name: n.name().to_string(),
-                    offset: n.offset(),
-                })
-            } else {
-                None
-            };
-
-            let info = if options.procedure_info {
-                cursor.procedure_info().ok().map(|i| ProcedureInfo {
-                    start_ip: i.start_ip(),
-                    end_ip: i.end_ip(),
-                })
-            } else {
-                None
-            };
+            let mut symbol = None;
+            if options.symbols {
+                match (cursor.procedure_name(), cursor.procedure_info()) {
+                    (Ok(ref name), Ok(ref info)) if info.start_ip() + name.offset() == ip => {
+                        symbol = Some(Symbol {
+                            name: name.name().to_string(),
+                            offset: name.offset(),
+                            address: info.start_ip(),
+                            size: info.end_ip() - info.start_ip(),
+                        });
+                    }
+                    _ => {}
+                }
+            }
 
             frames.push(Frame {
                 ip,
                 is_signal,
-                name,
-                info,
+                symbol,
             });
 
             if !cursor.step()? {

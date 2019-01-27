@@ -2,7 +2,7 @@ pub use dw_::dwfl::Error;
 use dw_::dwfl::{Callbacks, Dwfl, FindDebuginfo, FindElf};
 use lazy_static::lazy_static;
 
-use crate::{Frame, ProcedureInfo, ProcedureName, TraceOptions, TracedThread};
+use crate::{Frame, Symbol, TraceOptions, TracedThread};
 
 lazy_static! {
     static ref CALLBACKS: Callbacks = Callbacks::new(FindElf::LINUX_PROC, FindDebuginfo::STANDARD);
@@ -30,9 +30,8 @@ impl TracedThread {
             let mut is_signal = false;
             let ip = frame.pc(Some(&mut is_signal))?;
 
-            let mut name = None;
-            let mut info = None;
-            if options.procedure_names || options.procedure_info {
+            let mut symbol = None;
+            if options.symbols {
                 let signal_adjust = if is_signal { 0 } else { 1 };
 
                 if let Ok(i) = frame
@@ -41,27 +40,19 @@ impl TracedThread {
                     .addr_module(ip - signal_adjust)
                     .and_then(|module| module.addr_info(ip - signal_adjust))
                 {
-                    if options.procedure_names {
-                        name = Some(ProcedureName {
-                            name: i.name().to_string_lossy().into_owned(),
-                            offset: i.offset() + signal_adjust,
-                        });
-                    }
-                    if options.procedure_info {
-                        let start_ip = i.bias() + i.symbol().value();
-                        info = Some(ProcedureInfo {
-                            start_ip,
-                            end_ip: start_ip + i.symbol().size(),
-                        });
-                    }
+                    symbol = Some(Symbol {
+                        name: i.name().to_string_lossy().into_owned(),
+                        offset: i.offset() + signal_adjust,
+                        address: i.bias() + i.symbol().value(),
+                        size: i.symbol().size(),
+                    });
                 }
             }
 
             frames.push(Frame {
                 ip,
-                is_signal: Some(is_signal),
-                name,
-                info,
+                is_signal,
+                symbol,
             });
 
             Ok(())
