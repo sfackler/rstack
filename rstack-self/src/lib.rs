@@ -373,9 +373,7 @@ fn child_trace(options: &RawOptions) -> result::Result<Vec<RawThread>, String> {
             .iter()
             .map(|thread| RawThread {
                 id: thread.id(),
-                name: thread
-                    .name()
-                    .map_or_else(|| "<unknown>".to_string(), |s| s.to_string()),
+                name: thread.name().unwrap_or("<unknown>").to_string(),
                 frames: thread
                     .frames()
                     .iter()
