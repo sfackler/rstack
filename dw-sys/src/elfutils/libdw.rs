@@ -1,6 +1,6 @@
 use libc::{c_char, c_int, c_long, c_uchar, c_uint, c_void, ptrdiff_t, size_t};
 
-use *;
+use crate::*;
 
 c_enum! {
     Dwarf_Cmd {

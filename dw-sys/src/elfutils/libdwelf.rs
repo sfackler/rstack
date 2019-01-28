@@ -1,6 +1,6 @@
 use libc::{c_char, c_void, size_t, ssize_t};
 
-use *;
+use crate::*;
 
 pub enum Dwelf_Strtab {}
 pub enum Dwelf_Strent {}

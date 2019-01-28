@@ -1,6 +1,6 @@
 use libc::{c_char, c_int, c_uchar, c_uint, c_void, pid_t, ptrdiff_t, size_t, FILE};
 
-use *;
+use crate::*;
 
 pub enum Dwfl {}
 pub enum Dwfl_Module {}

@@ -1,4 +1,4 @@
-extern crate pkg_config;
+use pkg_config;
 
 fn main() {
     pkg_config::probe_library("libdw").unwrap();
