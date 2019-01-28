@@ -3,9 +3,15 @@ name = "dw"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 edition = "2018"
+description = "An interface to libdw"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/sfackler/rstack"
+documentation = "https://sfackler.github.io/rstack/doc/dw"
+categories = ["api-bindings", "development-tools::debugging"]
+keywords = ["stack", "backtrace", "stacktrace"]
 
 [dependencies]
 foreign-types = "0.3"
 libc = "0.2"
 
-dw-sys = { path = "../dw-sys" }
+dw-sys = { version = "0.1.0", path = "../dw-sys" }
