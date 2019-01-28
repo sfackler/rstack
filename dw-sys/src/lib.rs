@@ -1,3 +1,4 @@
+#![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![allow(bad_style)]
 
 extern crate libc;
