@@ -9,6 +9,7 @@ use std::ptr;
 
 use crate::dwfl::{cvt, Callbacks, Error, FrameRef, ModuleRef, ThreadRef};
 
+/// The base type used when interacting with libdwfl.
 pub struct Dwfl<'a>(*mut dw_sys::Dwfl, PhantomData<&'a ()>);
 
 impl<'a> Drop for Dwfl<'a> {
@@ -51,6 +52,7 @@ impl<'a> DerefMut for Dwfl<'a> {
 }
 
 impl<'a> Dwfl<'a> {
+    /// Creates a new `Dwfl` which will use the specified callbacks.
     pub fn begin(callbacks: &'a Callbacks) -> Result<Dwfl<'a>, Error> {
         unsafe {
             let ptr = dw_sys::dwfl_begin(callbacks.as_ptr());
@@ -63,6 +65,7 @@ impl<'a> Dwfl<'a> {
     }
 }
 
+/// A borrowed reference to a `Dwfl`.
 pub struct DwflRef<'a>(Opaque, PhantomData<&'a ()>);
 
 impl<'a> ForeignTypeRef for DwflRef<'a> {
@@ -70,6 +73,7 @@ impl<'a> ForeignTypeRef for DwflRef<'a> {
 }
 
 impl<'a> DwflRef<'a> {
+    /// Returns a string describing the version of libdw used.
     pub fn version(&self) -> &str {
         unsafe {
             let p = dw_sys::dwfl_version(self.as_ptr());
@@ -77,6 +81,9 @@ impl<'a> DwflRef<'a> {
         }
     }
 
+    /// Starts a "reporting" session used to register new segments and modules.
+    ///
+    /// Existing segments and modules will be removed.
     pub fn report(&mut self) -> Report<'_, 'a> {
         unsafe {
             dw_sys::dwfl_report_begin(self.as_ptr());
@@ -84,6 +91,9 @@ impl<'a> DwflRef<'a> {
         }
     }
 
+    /// Starts a "reporting" session used to register new segments and modules.
+    ///
+    /// Unlike the `report` method, this will not remove existing segments and modules.
     pub fn report_add(&mut self) -> Report<'_, 'a> {
         unsafe {
             dw_sys::dwfl_report_begin_add(self.as_ptr());
@@ -91,6 +101,11 @@ impl<'a> DwflRef<'a> {
         }
     }
 
+    /// Configures the session to unwind the threads of a remote process via ptrace and the `/proc` pseudo-filesystem.
+    ///
+    /// Normally, the session will ptrace attach to threads being unwound, but if `assume_ptrace_stopped` is set to
+    /// `true`, this will not happen. It's then the responsibility of the caller to ensure that the thread is already
+    /// attached and stopped.
     pub fn linux_proc_attach(
         &mut self,
         pid: u32,
@@ -105,6 +120,9 @@ impl<'a> DwflRef<'a> {
         }
     }
 
+    /// Iterates through the threads of the attached process.
+    ///
+    /// The callback will be invoked for each thread in turn.
     pub fn threads<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(&mut ThreadRef) -> Result<(), Error>,
@@ -132,6 +150,9 @@ impl<'a> DwflRef<'a> {
         }
     }
 
+    /// Iterates through the frames of a specific thread of the attached process.
+    ///
+    /// The callback will be invoked for each stack frame of the thread in turn.
     pub fn thread_frames<F>(&mut self, tid: u32, callback: F) -> Result<(), Error>
     where
         F: FnMut(&mut FrameRef) -> Result<(), Error>,
@@ -160,6 +181,7 @@ impl<'a> DwflRef<'a> {
         }
     }
 
+    /// Looks up the module containing the address.
     pub fn addr_module(&self, address: u64) -> Result<&ModuleRef, Error> {
         unsafe {
             let ptr = dw_sys::dwfl_addrmodule(self.as_ptr(), address);
@@ -172,6 +194,7 @@ impl<'a> DwflRef<'a> {
     }
 }
 
+/// A type used to register segments and modules with a DWFL session.
 pub struct Report<'a, 'b>(&'a mut DwflRef<'b>);
 
 impl<'a, 'b> Drop for Report<'a, 'b> {
@@ -183,6 +206,9 @@ impl<'a, 'b> Drop for Report<'a, 'b> {
 }
 
 impl<'a, 'b> Report<'a, 'b> {
+    /// Uses the `/proc` pseudo-filesystem to register the information for a specific running process.
+    ///
+    /// The `LINUX_PROC` `FindElf` callback should be used with this method.
     pub fn linux_proc(&mut self, pid: u32) -> Result<(), Error> {
         unsafe {
             cvt(dw_sys::dwfl_linux_proc_report(

@@ -3,6 +3,7 @@ use std::error;
 use std::ffi::CStr;
 use std::fmt;
 
+/// A error returned by DWFL APIs.
 pub struct Error(c_int);
 
 impl fmt::Debug for Error {

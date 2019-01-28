@@ -1,18 +1,20 @@
+//! DWFL types.
+
 use libc::c_int;
 
 pub use self::callbacks::*;
 pub use self::dwfl::*;
-pub use self::frame::*;
-pub use self::thread::*;
 pub use self::error::*;
+pub use self::frame::*;
 pub use self::module::*;
+pub use self::thread::*;
 
 mod callbacks;
 mod dwfl;
-mod frame;
-mod thread;
 mod error;
+mod frame;
 mod module;
+mod thread;
 
 fn cvt(r: c_int) -> Result<(), Error> {
     if r == 0 {

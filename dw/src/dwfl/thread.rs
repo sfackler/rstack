@@ -5,6 +5,7 @@ use std::panic::{self, AssertUnwindSafe};
 
 use crate::dwfl::{cvt, DwflRef, Error, FrameRef};
 
+/// A reference to a thread.
 pub struct ThreadRef(Opaque);
 
 impl ForeignTypeRef for ThreadRef {
@@ -12,6 +13,7 @@ impl ForeignTypeRef for ThreadRef {
 }
 
 impl ThreadRef {
+    /// Returns the base session associated with this thread.
     pub fn dwfl(&self) -> &DwflRef<'_> {
         unsafe {
             let ptr = dw_sys::dwfl_thread_dwfl(self.as_ptr());
@@ -19,10 +21,14 @@ impl ThreadRef {
         }
     }
 
+    /// Returns the thread's ID.
     pub fn tid(&self) -> u32 {
         unsafe { dw_sys::dwfl_thread_tid(self.as_ptr()) as u32 }
     }
 
+    /// Iterates through the frames of the thread.
+    ///
+    /// The callback will be invoked for each stack frame of the thread in turn.
     pub fn frames<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(&mut FrameRef) -> Result<(), Error>,

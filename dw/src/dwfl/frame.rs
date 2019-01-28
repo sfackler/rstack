@@ -1,8 +1,9 @@
 use foreign_types::{ForeignTypeRef, Opaque};
 use std::ptr;
 
-use crate::dwfl::{ThreadRef, Error};
+use crate::dwfl::{Error, ThreadRef};
 
+/// A reference to a stack frame.
 pub struct FrameRef(Opaque);
 
 impl ForeignTypeRef for FrameRef {
@@ -10,6 +11,7 @@ impl ForeignTypeRef for FrameRef {
 }
 
 impl FrameRef {
+    /// Returns a reference to the thread corresponding to this frame.
     pub fn thread(&self) -> &ThreadRef {
         unsafe {
             let ptr = dw_sys::dwfl_frame_thread(self.as_ptr());
@@ -17,6 +19,10 @@ impl FrameRef {
         }
     }
 
+    /// Returns the address of the instruction pointer at this frame.
+    ///
+    /// If provided, `is_activation` parameter will be set to true if this frame is an "activation" (i.e. signal) frame,
+    /// and false otherwise.
     pub fn pc(&self, is_activation: Option<&mut bool>) -> Result<u64, Error> {
         unsafe {
             let mut pc = 0;
