@@ -41,7 +41,7 @@ pub struct FindElf(
 );
 
 impl FindElf {
-    /// A standard callback which uses the `/proc` pseudo-filesystem to locate ELF images.
+    /// A standard callback used with `Register::linux_proc`.
     pub const LINUX_PROC: FindElf = FindElf(dw_sys::dwfl_linux_proc_find_elf);
 }
 

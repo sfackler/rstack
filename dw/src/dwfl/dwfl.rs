@@ -208,7 +208,7 @@ impl<'a, 'b> Drop for Report<'a, 'b> {
 impl<'a, 'b> Report<'a, 'b> {
     /// Uses the `/proc` pseudo-filesystem to register the information for a specific running process.
     ///
-    /// The `LINUX_PROC` `FindElf` callback should be used with this method.
+    /// The `FindElf::LINUX_PROC` callback should be used with this method.
     pub fn linux_proc(&mut self, pid: u32) -> Result<(), Error> {
         unsafe {
             cvt(dw_sys::dwfl_linux_proc_report(
