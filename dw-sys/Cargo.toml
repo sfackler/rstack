@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 edition = "2018"
 links = "dw"
+description = "FFI bindings to libdw"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/sfackler/rstack"
+documentation = "https://sfackler.github.io/rstack/doc/dw_sys"
+categories = ["external-ffi-bindings", "development-tools::debugging"]
+keywords = ["stack", "backtrace", "stacktrace"]
 
 [build-dependencies]
 pkg-config = "0.3"
