@@ -1,6 +1,6 @@
 [package]
 name = "rstack-self"
-version = "0.1.3"
+version = "0.2.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 edition = "2018"
 description = "Stack traces of all threads of a process"
