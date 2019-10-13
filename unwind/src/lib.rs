@@ -48,10 +48,10 @@ use std::error;
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::result;
 use unwind_sys::*;
+use std::mem::MaybeUninit;
 
 /// The result type returned by functions in this crate.
 pub type Result<T> = result::Result<T, Error>;
@@ -286,33 +286,34 @@ impl<'a> Cursor<'a> {
         F: FnOnce(Cursor<'_>) -> Result<T>,
     {
         unsafe {
-            let mut context = mem::uninitialized();
-            let ret = unw_tdep_getcontext(&mut context);
+            let mut context = MaybeUninit::uninit();
+            let ret = unw_tdep_getcontext(context.as_mut_ptr());
+            if ret != UNW_ESUCCESS {
+                return Err(Error(ret));
+            }
+            let mut context = context.assume_init();
+
+            let mut cursor = MaybeUninit::uninit();
+            let ret = unw_init_local(cursor.as_mut_ptr(), &mut context);
             if ret != UNW_ESUCCESS {
                 return Err(Error(ret));
             }
 
-            let mut cursor = mem::uninitialized();
-            let ret = unw_init_local(&mut cursor, &mut context);
-            if ret != UNW_ESUCCESS {
-                return Err(Error(ret));
-            }
-
-            f(Cursor(cursor, PhantomData))
+            f(Cursor(cursor.assume_init(), PhantomData))
         }
     }
 
     /// Creates a cursor over the stack of a "remote" process.
     pub fn remote<T>(address_space: &'a AddressSpaceRef<T>, state: &'a T) -> Result<Cursor<'a>> {
         unsafe {
-            let mut cursor = mem::uninitialized();
+            let mut cursor = MaybeUninit::uninit();
             let ret = unw_init_remote(
-                &mut cursor,
+                cursor.as_mut_ptr(),
                 address_space.as_ptr(),
                 state as *const T as *mut c_void,
             );
             if ret == UNW_ESUCCESS {
-                Ok(Cursor(cursor, PhantomData))
+                Ok(Cursor(cursor.assume_init(), PhantomData))
             } else {
                 Err(Error(ret))
             }
@@ -359,9 +360,10 @@ impl<'a> Cursor<'a> {
     /// Returns information about the procedure at the current frame.
     pub fn procedure_info(&mut self) -> Result<ProcedureInfo> {
         unsafe {
-            let mut info = mem::uninitialized();
-            let ret = unw_get_proc_info(&self.0 as *const _ as *mut _, &mut info);
+            let mut info = MaybeUninit::uninit();
+            let ret = unw_get_proc_info(&self.0 as *const _ as *mut _, info.as_mut_ptr());
             if ret == UNW_ESUCCESS {
+                let info = info.assume_init();
                 Ok(ProcedureInfo {
                     start_ip: info.start_ip as u64,
                     end_ip: info.end_ip as u64,
