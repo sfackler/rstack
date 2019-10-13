@@ -1,4 +1,4 @@
-#![allow(bad_style, invalid_value, unknown_lints)]
+#![allow(bad_style, unknown_lints, invalid_value)]
 
 extern crate dw_sys;
 extern crate libc;
