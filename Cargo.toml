@@ -5,7 +5,6 @@ members = [
     "dw-systest",
     "rstack",
     "rstack-self",
-    "symbolize",
     "unwind",
     "unwind-sys",
     "unwind-systest",
