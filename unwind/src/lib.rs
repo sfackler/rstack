@@ -48,10 +48,10 @@ use std::error;
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::result;
 use unwind_sys::*;
-use std::mem::MaybeUninit;
 
 /// The result type returned by functions in this crate.
 pub type Result<T> = result::Result<T, Error>;
@@ -496,8 +496,11 @@ mod test {
         use std::io;
         use std::process::Command;
         use std::ptr;
+        use std::thread;
+        use std::time::Duration;
 
         let mut child = Command::new("sleep").arg("10").spawn().unwrap();
+        thread::sleep(Duration::from_millis(10));
         unsafe {
             let ret = libc::ptrace(
                 libc::PTRACE_ATTACH,
