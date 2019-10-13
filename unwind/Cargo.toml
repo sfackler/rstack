@@ -15,6 +15,6 @@ ptrace = ["unwind-sys/ptrace"]
 
 [dependencies]
 libc = "0.2"
-foreign-types = "0.3"
+foreign-types = "0.5"
 
 unwind-sys = { version = "0.1.1", path = "../unwind-sys" }

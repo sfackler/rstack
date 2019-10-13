@@ -8,7 +8,7 @@ use crate::dwfl::{cvt, DwflRef, Error, FrameRef};
 /// A reference to a thread.
 pub struct ThreadRef(Opaque);
 
-impl ForeignTypeRef for ThreadRef {
+unsafe impl ForeignTypeRef for ThreadRef {
     type CType = dw_sys::Dwfl_Thread;
 }
 
@@ -59,7 +59,7 @@ impl ThreadRef {
 
 struct CallbackState<F> {
     callback: F,
-    panic: Option<Box<Any + Send>>,
+    panic: Option<Box<dyn Any + Send>>,
     error: Option<Error>,
 }
 

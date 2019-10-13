@@ -9,7 +9,7 @@ use crate::elf::Symbol;
 /// A reference to a module.
 pub struct ModuleRef(Opaque);
 
-impl ForeignTypeRef for ModuleRef {
+unsafe impl ForeignTypeRef for ModuleRef {
     type CType = dw_sys::Dwfl_Module;
 }
 

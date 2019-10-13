@@ -1,53 +1,18 @@
-use foreign_types::{ForeignType, ForeignTypeRef, Opaque};
+use foreign_types::{foreign_type, ForeignType, ForeignTypeRef};
 use libc::{c_int, c_void, pid_t};
 use std::any::Any;
 use std::ffi::CStr;
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
 
 use crate::dwfl::{cvt, Callbacks, Error, FrameRef, ModuleRef, ThreadRef};
 
-/// The base type used when interacting with libdwfl.
-pub struct Dwfl<'a>(*mut dw_sys::Dwfl, PhantomData<&'a ()>);
-
-impl<'a> Drop for Dwfl<'a> {
-    fn drop(&mut self) {
-        unsafe {
-            dw_sys::dwfl_end(self.as_ptr());
-        }
-    }
-}
-
-impl<'a> ForeignType for Dwfl<'a> {
-    type CType = dw_sys::Dwfl;
-    type Ref = DwflRef<'a>;
-
-    #[inline]
-    unsafe fn from_ptr(ptr: *mut dw_sys::Dwfl) -> Dwfl<'a> {
-        Dwfl(ptr, PhantomData)
-    }
-
-    #[inline]
-    fn as_ptr(&self) -> *mut dw_sys::Dwfl {
-        self.0
-    }
-}
-
-impl<'a> Deref for Dwfl<'a> {
-    type Target = DwflRef<'a>;
-
-    #[inline]
-    fn deref(&self) -> &DwflRef<'a> {
-        unsafe { &*(self.as_ptr() as *mut DwflRef<'a>) }
-    }
-}
-
-impl<'a> DerefMut for Dwfl<'a> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut DwflRef<'a> {
-        unsafe { &mut *(self.as_ptr() as *mut DwflRef<'a>) }
+foreign_type! {
+    /// The base type used when interacting with libdwfl.
+    pub unsafe type Dwfl<'a> {
+        type CType = dw_sys::Dwfl;
+        type PhantomData = &'a ();
+        fn drop = dw_sys::dwfl_end;
     }
 }
 
@@ -63,13 +28,6 @@ impl<'a> Dwfl<'a> {
             }
         }
     }
-}
-
-/// A borrowed reference to a `Dwfl`.
-pub struct DwflRef<'a>(Opaque, PhantomData<&'a ()>);
-
-impl<'a> ForeignTypeRef for DwflRef<'a> {
-    type CType = dw_sys::Dwfl;
 }
 
 impl<'a> DwflRef<'a> {
@@ -221,7 +179,7 @@ impl<'a, 'b> Report<'a, 'b> {
 
 struct ThreadsCallbackState<F> {
     callback: F,
-    panic: Option<Box<Any + Send>>,
+    panic: Option<Box<dyn Any + Send>>,
     error: Option<Error>,
 }
 
@@ -247,7 +205,7 @@ where
 
 struct FramesCallbackState<F> {
     callback: F,
-    panic: Option<Box<Any + Send>>,
+    panic: Option<Box<dyn Any + Send>>,
     error: Option<Error>,
 }
 

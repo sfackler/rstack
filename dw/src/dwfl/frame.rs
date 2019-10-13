@@ -6,7 +6,7 @@ use crate::dwfl::{Error, ThreadRef};
 /// A reference to a stack frame.
 pub struct FrameRef(Opaque);
 
-impl ForeignTypeRef for FrameRef {
+unsafe impl ForeignTypeRef for FrameRef {
     type CType = dw_sys::Dwfl_Frame;
 }
 

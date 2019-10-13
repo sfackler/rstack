@@ -11,7 +11,7 @@ categories = ["api-bindings", "development-tools::debugging"]
 keywords = ["stack", "backtrace", "stacktrace"]
 
 [dependencies]
-foreign-types = "0.3"
+foreign-types = "0.5"
 libc = "0.2"
 
 dw-sys = { version = "0.1.0", path = "../dw-sys" }

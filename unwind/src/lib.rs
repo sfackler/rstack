@@ -40,7 +40,9 @@
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
 #![warn(missing_docs)]
 
-use foreign_types::{foreign_type, Opaque};
+use foreign_types::Opaque;
+#[cfg(feature = "ptrace")]
+use foreign_types::{foreign_type, ForeignType};
 use libc::{c_char, c_int, c_void};
 use std::error;
 use std::ffi::CStr;
@@ -122,18 +124,13 @@ impl Byteorder {
 
 #[cfg(feature = "ptrace")]
 foreign_type! {
-    type CType = c_void;
-    fn drop = _UPT_destroy;
-
     /// The unwind state used by the ptrace accessors.
     ///
     /// The `ptrace` Cargo feature must be enabled to use this type.
-    pub struct PTraceState;
-
-    /// A borrowed reference to a [`PTraceState`].
-    ///
-    /// [`PTraceState`]: struct.PTraceState.html
-    pub struct PTraceStateRef;
+    pub unsafe type PTraceState {
+        type CType = c_void;
+        fn drop = _UPT_destroy;
+    }
 }
 
 #[cfg(feature = "ptrace")]
@@ -148,7 +145,7 @@ impl PTraceState {
                 // this is documented to only fail on OOM
                 Err(Error(-UNW_ENOMEM))
             } else {
-                Ok(PTraceState(ptr))
+                Ok(PTraceState::from_ptr(ptr))
             }
         }
     }
