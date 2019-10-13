@@ -33,6 +33,11 @@ fn main() {
             ("unw_save_loc_t", "type_") => "type".to_string(),
             (_, f) => f.to_string(),
         })
+        .skip_type(|s| match s {
+            // https://github.com/rust-lang/libc/issues/1410
+            "unw_tdep_context_t" | "unw_context_t" => true,
+            _ => false,
+        })
         .skip_struct(|s| match s {
             "unw_save_loc_t_u" => true,
             _ => false,
