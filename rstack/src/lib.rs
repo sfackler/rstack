@@ -201,6 +201,7 @@ pub struct TraceOptions {
     snapshot: bool,
     thread_names: bool,
     symbols: bool,
+    ptrace_attach: bool,
 }
 
 impl Default for TraceOptions {
@@ -209,6 +210,7 @@ impl Default for TraceOptions {
             snapshot: false,
             thread_names: false,
             symbols: false,
+            ptrace_attach: true,
         }
     }
 }
@@ -246,6 +248,15 @@ impl TraceOptions {
         self
     }
 
+    /// If set to `false`, `rstack` will not try to attach to child via ptrace.
+
+    /// Use it if target process is already traced by your application
+    /// Defaults to `true`.
+    pub fn ptrace_attach(&mut self, ptrace_attach: bool) -> &mut TraceOptions {
+        self.ptrace_attach = ptrace_attach;
+        self
+    }
+
     /// Traces the threads of the specified process.
     pub fn trace(&self, pid: u32) -> Result<Process> {
         let mut state = imp::State::new(pid).map_err(|e| Error(ErrorInner::Unwind(e)))?;
@@ -260,7 +271,7 @@ impl TraceOptions {
     }
 
     fn trace_snapshot(&self, pid: u32, state: &mut imp::State) -> Result<Vec<Thread>> {
-        let threads = snapshot_threads(pid)?
+        let threads = snapshot_threads(pid, self.ptrace_attach)?
             .iter()
             .map(|t| t.info(pid, state, self))
             .collect();
@@ -272,7 +283,12 @@ impl TraceOptions {
         let mut threads = vec![];
 
         each_thread(pid, |tid| {
-            let thread = match TracedThread::new(tid) {
+            let thread = if self.ptrace_attach {
+                TracedThread::attach(tid)
+            } else {
+                TracedThread::traced(tid)
+            };
+            let thread = match thread {
                 Ok(thread) => thread,
                 Err(ref e) if e.raw_os_error() == Some(ESRCH) => {
                     debug!("error attaching to thread {}: {}", tid, e);
@@ -290,14 +306,14 @@ impl TraceOptions {
     }
 }
 
-fn snapshot_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
+fn snapshot_threads(pid: u32, ptrace_attach: bool) -> Result<BTreeSet<TracedThread>> {
     let mut threads = BTreeSet::new();
 
     // new threads may be created while we're in the process of stopping them all, so loop a couple
     // of times to hopefully converge
     for _ in 0..5 {
         let prev = threads.len();
-        add_threads(&mut threads, pid)?;
+        add_threads(&mut threads, pid, ptrace_attach)?;
         if prev == threads.len() {
             break;
         }
@@ -306,10 +322,15 @@ fn snapshot_threads(pid: u32) -> Result<BTreeSet<TracedThread>> {
     Ok(threads)
 }
 
-fn add_threads(threads: &mut BTreeSet<TracedThread>, pid: u32) -> Result<()> {
+fn add_threads(threads: &mut BTreeSet<TracedThread>, pid: u32, ptrace_attach: bool) -> Result<()> {
     each_thread(pid, |tid| {
         if !threads.contains(&tid) {
-            let thread = match TracedThread::new(tid) {
+            let thread = if ptrace_attach {
+                TracedThread::attach(pid)
+            } else {
+                TracedThread::traced(pid)
+            };
+            let thread = match thread {
                 Ok(thread) => thread,
                 // ESRCH just means the thread died in the middle of things, which is fine
                 Err(e) => {
@@ -348,29 +369,36 @@ where
 }
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
-struct TracedThread(u32);
+struct TracedThread {
+    id: u32,
+    // True if TraceOptions::ptrace_attach was true (default value)
+    // It means that Drop should perform detach
+    should_detach: bool,
+}
 
 impl Drop for TracedThread {
     fn drop(&mut self) {
-        unsafe {
-            ptrace(
-                PTRACE_DETACH,
-                self.0 as pid_t,
-                ptr::null_mut::<c_void>(),
-                ptr::null_mut::<c_void>(),
-            );
+        if self.should_detach {
+            unsafe {
+                ptrace(
+                    PTRACE_DETACH,
+                    self.id as pid_t,
+                    ptr::null_mut::<c_void>(),
+                    ptr::null_mut::<c_void>(),
+                );
+            }
         }
     }
 }
 
 impl Borrow<u32> for TracedThread {
     fn borrow(&self) -> &u32 {
-        &self.0
+        &self.id
     }
 }
 
 impl TracedThread {
-    fn new(pid: u32) -> io::Result<TracedThread> {
+    fn attach(pid: u32) -> io::Result<TracedThread> {
         unsafe {
             let ret = ptrace(
                 PTRACE_SEIZE,
@@ -388,7 +416,10 @@ impl TracedThread {
                 return Err(e);
             }
 
-            let thread = TracedThread(pid);
+            let thread = TracedThread {
+                id: pid,
+                should_detach: true,
+            };
 
             let ret = ptrace(
                 PTRACE_INTERRUPT,
@@ -419,6 +450,15 @@ impl TracedThread {
         }
     }
 
+    /// Creates `TracedThread` without attaching to process. Should not be used, if pid is not
+    /// traced by current process
+    fn traced(pid: u32) -> io::Result<TracedThread> {
+        Ok(TracedThread {
+            id: pid,
+            should_detach: false,
+        })
+    }
+
     fn new_fallback(pid: u32) -> io::Result<TracedThread> {
         unsafe {
             let ret = ptrace(
@@ -431,7 +471,10 @@ impl TracedThread {
                 return Err(io::Error::last_os_error());
             }
 
-            let thread = TracedThread(pid);
+            let thread = TracedThread {
+                id: pid,
+                should_detach: true,
+            };
 
             let mut status = 0;
             loop {
@@ -480,7 +523,7 @@ impl TracedThread {
         let frames = self.dump(state, options);
 
         Thread {
-            id: self.0,
+            id: self.id,
             name,
             frames,
         }
@@ -490,19 +533,19 @@ impl TracedThread {
         let mut frames = vec![];
 
         if let Err(e) = self.dump_inner(state, options, &mut frames) {
-            debug!("error tracing thread {}: {}", self.0, e);
+            debug!("error tracing thread {}: {}", self.id, e);
         }
 
         frames
     }
 
     fn name(&self, pid: u32) -> Option<String> {
-        let path = format!("/proc/{}/task/{}/comm", pid, self.0);
+        let path = format!("/proc/{}/task/{}/comm", pid, self.id);
         let mut name = vec![];
         match File::open(path).and_then(|mut f| f.read_to_end(&mut name)) {
             Ok(_) => Some(String::from_utf8_lossy(&name).trim().to_string()),
             Err(e) => {
-                debug!("error getting name for thread {}: {}", self.0, e);
+                debug!("error getting name for thread {}: {}", self.id, e);
                 None
             }
         }

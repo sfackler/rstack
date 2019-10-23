@@ -18,7 +18,7 @@ impl TracedThread {
         options: &TraceOptions,
         frames: &mut Vec<Frame>,
     ) -> Result<(), Error> {
-        let state = PTraceState::new(self.0)?;
+        let state = PTraceState::new(self.id)?;
         let mut cursor = Cursor::remote(&space.0, &state)?;
 
         loop {
