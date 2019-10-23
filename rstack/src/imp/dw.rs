@@ -26,7 +26,7 @@ impl TracedThread {
         options: &TraceOptions,
         frames: &mut Vec<Frame>,
     ) -> Result<(), Error> {
-        dwfl.0.thread_frames(self.0, |frame| {
+        dwfl.0.thread_frames(self.id, |frame| {
             let mut is_signal = false;
             let ip = frame.pc(Some(&mut is_signal))?;
 
