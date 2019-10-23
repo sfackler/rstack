@@ -248,9 +248,11 @@ impl TraceOptions {
         self
     }
 
-    /// If set to `false`, `rstack` will not try to attach to child via ptrace.
-
-    /// Use it if target process is already traced by your application
+    /// If set, `rstack` will automatically attach to threads via ptrace.
+    ///
+    /// If disabled, the calling process must already be attached to all traced threads, and the
+    /// threads must be in the stopped state.
+    ///
     /// Defaults to `true`.
     pub fn ptrace_attach(&mut self, ptrace_attach: bool) -> &mut TraceOptions {
         self.ptrace_attach = ptrace_attach;
