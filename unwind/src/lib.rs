@@ -274,7 +274,7 @@ impl ProcedureName {
 /// stack. While a cursor cannot be run "backwards", it can be cloned, and one of the copies
 /// advanced while the other continues to refer to the previous frame.
 #[derive(Clone)]
-pub struct Cursor<'a>(unw_cursor_t, PhantomData<(&'a ())>);
+pub struct Cursor<'a>(unw_cursor_t, PhantomData<&'a ()>);
 
 impl<'a> Cursor<'a> {
     /// Creates a cursor over the stack of the calling thread.
