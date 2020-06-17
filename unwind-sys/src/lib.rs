@@ -6,10 +6,12 @@ pub use crate::native::*;
 #[cfg(feature = "ptrace")]
 pub use crate::ptrace::*;
 
-#[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
+#[cfg(target_arch = "x86_64")]
+#[path = "x86_64.rs"]
 mod native;
 
-#[cfg_attr(target_arch = "x86", path = "x86.rs")]
+#[cfg(target_arch = "x86")]
+#[path = "x86.rs"]
 mod native;
 
 #[cfg(feature = "ptrace")]
