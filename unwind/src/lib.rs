@@ -350,7 +350,7 @@ impl<'a> Cursor<'a> {
             let mut val = 0;
             let ret = unw_get_reg(&self.0 as *const _ as *mut _, num.0, &mut val);
             if ret == UNW_ESUCCESS {
-                Ok(val)
+                Ok(val as u64)
             } else {
                 Err(Error(ret))
             }
