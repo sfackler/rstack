@@ -32,13 +32,46 @@ jobs:
           paths:
             - target
             - /usr/local/cargo/registry/cache
+  aarch64:
+    docker:
+      - image: rustlang/rust:nightly
+    environment:
+      RUSTFLAGS: -D warnings
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64 -L /usr/aarch64-linux-gnu
+      PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
+      PKG_CONFIG_ALLOW_CROSS: 1
+    steps:
+      - checkout
+      - run: dpkg --add-architecture arm64
+      - run: apt-get update
+      - run: apt-get install -y gcc-aarch64-linux-gnu qemu-user libunwind-dev:arm64
+      - run: rustup target add aarch64-unknown-linux-gnu
+      - run: rustc --version > ~/rust-version
+      - restore_cache:
+          key: registry
+      - run: cargo generate-lockfile
+      - save_cache:
+          key: registry-{{ .BuildNum }}
+          paths:
+            - /usr/local/cargo/registry/index
+      - restore_cache:
+          key: deps-{{ checksum "~/rust-version" }}-{{ checksum "Cargo.lock" }}
+      - run: cargo test --manifest-path unwind/Cargo.toml --target aarch64-unknown-linux-gnu
+      # FIXME run systest when it's fixed to stop panicking on nightly
+      - save_cache:
+          key: deps-{{ checksum "~/rust-version" }}-{{ checksum "Cargo.lock" }}
+          paths:
+            - target
+            - /usr/local/cargo/registry/cache
 
 workflows:
   test:
     jobs:
       - test:
           name: stable
-          image: rust:1.36.0
+          image: rust:1.38.0
       - test:
           name: nightly
           image: rustlang/rust:nightly
+      - aarch64

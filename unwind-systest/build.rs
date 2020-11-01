@@ -16,13 +16,26 @@ fn main() {
     let version = env::var("DEP_UNWIND_VERSION").unwrap();
     let mut it = version.split(".");
     let major = it.next().unwrap().parse::<u32>().unwrap();
-    let minor = it.next().unwrap().parse::<u32>().unwrap();
+    let mut minor = it.next().unwrap().parse::<u32>().unwrap();
+    // the pkg-config version is messed up in old versions and reports e.g. 1.21 for 1.2.1!
+    if it.next().is_none() {
+        minor /= 10;
+    }
     if major < 1 || (major == 1 && minor < 2) {
         cfg.cfg("pre12", None);
     }
+    if major < 1 || (major == 1 && minor < 3) {
+        println!("cargo:rustc-cfg=pre13");
+    }
+    if major < 1 || (major == 1 && minor < 4) {
+        cfg.cfg("pre14", None);
+    }
 
     cfg.header("libunwind.h")
-        .type_name(|t, _, _| t.to_string())
+        .type_name(|t, _, _| match t {
+            "unw_sigcontext" => format!("struct {}", t),
+            _ => t.to_string(),
+        })
         .skip_signededness(|t| match t {
             "unw_tdep_fpreg_t" | "unw_tdep_context_t" | "unw_context_t" | "unw_addr_space_t" => {
                 true
