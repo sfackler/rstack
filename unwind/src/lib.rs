@@ -38,6 +38,7 @@
 //!
 //! [libunwind]: http://www.nongnu.org/libunwind/
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
+#![cfg_attr(target_arch = "aarch64", feature(asm))]
 #![warn(missing_docs)]
 
 use foreign_types::Opaque;
@@ -287,7 +288,7 @@ impl<'a> Cursor<'a> {
     {
         unsafe {
             let mut context = MaybeUninit::uninit();
-            let ret = unw_tdep_getcontext(context.as_mut_ptr());
+            let ret = unw_tdep_getcontext!(context.as_mut_ptr());
             if ret != UNW_ESUCCESS {
                 return Err(Error(ret));
             }
