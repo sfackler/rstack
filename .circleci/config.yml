@@ -36,6 +36,8 @@ jobs:
     parameters:
       target:
         type: string
+      dir_target:
+        type: string
       arch:
         type: string
       packages:
@@ -46,7 +48,7 @@ jobs:
       RUSTFLAGS: -D warnings
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64 -L /usr/aarch64-linux-gnu
-      PKG_CONFIG_PATH: /usr/lib/<< parameters.arch >>-linux-gnu/pkgconfig
+      PKG_CONFIG_PATH: /usr/lib/<< parameters.dir_target >>-linux-gnu/pkgconfig
       PKG_CONFIG_ALLOW_CROSS: 1
     steps:
       - checkout
@@ -84,10 +86,12 @@ workflows:
       - cross:
           name: aarch64
           target: aarch64-unknown-linux-gnu
+          dir_target: aarch64
           arch: arm64
           packages: gcc-aarch64-linux-gnu qemu-user
       - cross:
           name: x86
           target: i686-unknown-linux-gnu
+          dir_target: i386
           arch: i386
           packages: gcc-multilib
