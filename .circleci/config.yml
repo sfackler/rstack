@@ -58,6 +58,7 @@ jobs:
       - restore_cache:
           key: deps-{{ checksum "~/rust-version" }}-{{ checksum "Cargo.lock" }}
       - run: cargo test --manifest-path unwind/Cargo.toml --target aarch64-unknown-linux-gnu
+      - run: cargo run --manifest-path unwind-systest/Cargo.toml --target aarch64-unknown-linux-gnu
       # FIXME run systest when it's fixed to stop panicking on nightly
       - save_cache:
           key: deps-{{ checksum "~/rust-version" }}-{{ checksum "Cargo.lock" }}
