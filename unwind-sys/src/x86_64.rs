@@ -48,6 +48,13 @@ pub struct unw_tdep_proc_info_t {
     pub unused: c_char,
 }
 
+#[macro_export]
+macro_rules! unw_tdep_getcontext {
+    ($uc:expr) => {
+        $crate::unw_tdep_getcontext($uc)
+    };
+}
+
 extern "C" {
     #[link_name = "_Ux86_64_getcontext"]
     pub fn unw_tdep_getcontext(ctx: *mut unw_tdep_context_t) -> c_int;

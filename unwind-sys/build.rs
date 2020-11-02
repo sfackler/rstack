@@ -13,9 +13,19 @@ fn main() {
     // There were some ABI changes from 1.1 to 1.2 on x86_64
     let mut it = library.version.split(".");
     let major = it.next().unwrap().parse::<u32>().unwrap();
-    let minor = it.next().unwrap().parse::<u32>().unwrap();
+    let mut minor = it.next().unwrap().parse::<u32>().unwrap();
+    // the pkg-config version is messed up in old versions and reports e.g. 1.21 for 1.2.1!
+    if it.next().is_none() {
+        minor /= 10;
+    }
     if major < 1 || (major == 1 && minor < 2) {
         println!("cargo:rustc-cfg=pre12");
+    }
+    if major < 1 || (major == 1 && minor < 3) {
+        println!("cargo:rustc-cfg=pre13");
+    }
+    if major < 1 || (major == 1 && minor < 4) {
+        println!("cargo:rustc-cfg=pre14");
     }
 
     println!("cargo:version={}", library.version);
