@@ -8,32 +8,31 @@
 //! Printing a backtrace of the current thread:
 //!
 //! ```
-//! use unwind::{Cursor, RegNum};
+//! use unwind::{Cursor, RegNum, get_context};
 //!
-//! Cursor::local(|mut cursor| {
-//!     loop {
-//!         let ip = cursor.register(RegNum::IP)?;
+//! get_context!(context);
+//! let mut cursor = Cursor::local(context).unwrap();
 //!
-//!         match (cursor.procedure_info(), cursor.procedure_name()) {
-//!             (Ok(ref info), Ok(ref name)) if ip == info.start_ip() + name.offset() => {
-//!                 println!(
-//!                     "{:#016x} - {} ({:#016x}) + {:#x}",
-//!                     ip,
-//!                     name.name(),
-//!                     info.start_ip(),
-//!                     name.offset()
-//!                 );
-//!             }
-//!             _ => println!("{:#016x} - ????", ip),
+//! loop {
+//!     let ip = cursor.register(RegNum::IP).unwrap();
+//!
+//!     match (cursor.procedure_info(), cursor.procedure_name()) {
+//!         (Ok(ref info), Ok(ref name)) if ip == info.start_ip() + name.offset() => {
+//!             println!(
+//!                 "{:#016x} - {} ({:#016x}) + {:#x}",
+//!                 ip,
+//!                 name.name(),
+//!                 info.start_ip(),
+//!                 name.offset()
+//!             );
 //!         }
-//!
-//!         if !cursor.step()? {
-//!             break;
-//!         }
+//!         _ => println!("{:#016x} - ????", ip),
 //!     }
 //!
-//!     Ok(())
-//! }).unwrap();
+//!     if !cursor.step().unwrap() {
+//!         break;
+//!     }
+//! }
 //! ```
 //!
 //! [libunwind]: http://www.nongnu.org/libunwind/
@@ -49,10 +48,19 @@ use std::error;
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
+use std::marker::PhantomPinned;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 use std::result;
 use unwind_sys::*;
+
+#[doc(hidden)]
+pub mod private {
+    pub use std::mem::MaybeUninit;
+    pub use std::pin::Pin;
+    pub use unwind_sys::unw_tdep_getcontext;
+}
 
 /// The result type returned by functions in this crate.
 pub type Result<T> = result::Result<T, Error>;
@@ -269,6 +277,38 @@ impl ProcedureName {
     }
 }
 
+/// A snapshot of the machine-state of a process.
+///
+/// A pinned context can be created with the `get_context!` macro.
+pub struct Context(#[doc(hidden)] pub unw_context_t, PhantomPinned);
+
+/// Creates a `Context` pinned to the stack.
+///
+/// This is a macro rather than a function due to the implementation of the libunwind library. On `aarch64` targets,
+/// calling this macro requires a nightly compiler.
+///
+/// # Example
+///
+/// ```
+/// # use unwind::{get_context, Context};
+/// # use std::pin::Pin;
+///
+/// get_context!(context);
+/// let _: Pin<&mut Context> = context;
+/// ```
+#[macro_export]
+macro_rules! get_context {
+    ($name:ident) => {
+        // This is implemented using the same strategy as futures::pin_mut where the Pin shadows the original value,
+        // preventing it from being referenced and therefore moved.
+        let mut $name = $crate::private::MaybeUninit::<$crate::Context>::uninit();
+        unsafe {
+            $crate::private::unw_tdep_getcontext!(&mut (*$name.as_mut_ptr()).0);
+        }
+        let $name = unsafe { $crate::private::Pin::new_unchecked(&mut *$name.as_mut_ptr()) };
+    };
+}
+
 /// A cursor into a frame of a stack.
 ///
 /// The cursor starts at the current (topmost) frame, and can be advanced downwards through the
@@ -279,28 +319,15 @@ pub struct Cursor<'a>(unw_cursor_t, PhantomData<&'a ()>);
 
 impl<'a> Cursor<'a> {
     /// Creates a cursor over the stack of the calling thread.
-    ///
-    /// The cursor is provided to a closure rather than being returned because the stack frame being
-    /// referenced by the cursor must remain alive.
-    pub fn local<F, T>(f: F) -> Result<T>
-    where
-        F: FnOnce(Cursor<'_>) -> Result<T>,
-    {
+    pub fn local(context: Pin<&'a mut Context>) -> Result<Cursor<'a>> {
         unsafe {
-            let mut context = MaybeUninit::uninit();
-            let ret = unw_tdep_getcontext!(context.as_mut_ptr());
-            if ret != UNW_ESUCCESS {
-                return Err(Error(ret));
-            }
-            let mut context = context.assume_init();
-
             let mut cursor = MaybeUninit::uninit();
-            let ret = unw_init_local(cursor.as_mut_ptr(), &mut context);
+            let ret = unw_init_local(cursor.as_mut_ptr(), &mut context.get_unchecked_mut().0);
             if ret != UNW_ESUCCESS {
                 return Err(Error(ret));
             }
 
-            f(Cursor(cursor.assume_init(), PhantomData))
+            Ok(Cursor(cursor.assume_init(), PhantomData))
         }
     }
 
@@ -450,102 +477,5 @@ impl<'a> Cursor<'a> {
                 Ok(ret != 0)
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn local() {
-        fn bar() {
-            Cursor::local(|mut cursor| {
-                loop {
-                    let ip = cursor.register(RegNum::IP).unwrap();
-
-                    match (cursor.procedure_info(), cursor.procedure_name()) {
-                        (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
-                            println!(
-                                "{:#016x} - {} ({:#016x}) + {:#x}",
-                                ip, name.name, info.start_ip, name.offset
-                            );
-                        }
-                        _ => {
-                            println!("{:#016x} - ????", ip);
-                        }
-                    }
-
-                    if !cursor.step().unwrap() {
-                        break;
-                    }
-                }
-
-                Ok(())
-            })
-            .unwrap();
-        }
-        fn foo() {
-            bar();
-        }
-        foo();
-    }
-
-    #[test]
-    #[cfg(feature = "ptrace")]
-    fn remote() {
-        use std::io;
-        use std::process::Command;
-        use std::ptr;
-        use std::thread;
-        use std::time::Duration;
-
-        let mut child = Command::new("sleep").arg("10").spawn().unwrap();
-        thread::sleep(Duration::from_millis(10));
-        unsafe {
-            let ret = libc::ptrace(
-                libc::PTRACE_ATTACH,
-                child.id() as libc::pid_t,
-                ptr::null_mut::<c_void>(),
-                ptr::null_mut::<c_void>(),
-            );
-            if ret != 0 {
-                panic!("{}", io::Error::last_os_error());
-            }
-
-            loop {
-                let mut status = 0;
-                let ret = libc::waitpid(child.id() as libc::pid_t, &mut status, 0);
-                if ret < 0 {
-                    panic!("{}", io::Error::last_os_error());
-                }
-                if libc::WIFSTOPPED(status) {
-                    break;
-                }
-            }
-        }
-        let state = PTraceState::new(child.id() as _).unwrap();
-        let address_space = AddressSpace::new(Accessors::ptrace(), Byteorder::DEFAULT).unwrap();
-        let mut cursor = Cursor::remote(&address_space, &state).unwrap();
-
-        loop {
-            let ip = cursor.register(RegNum::IP).unwrap();
-
-            match (cursor.procedure_info(), cursor.procedure_name()) {
-                (Ok(ref info), Ok(ref name)) if ip == info.start_ip + name.offset => {
-                    println!(
-                        "{:#016x} - {} ({:#016x}) + {:#x}",
-                        ip, name.name, info.start_ip, name.offset
-                    );
-                }
-                _ => println!("{:#016x} - ????", ip),
-            }
-
-            if !cursor.step().unwrap() {
-                break;
-            }
-        }
-
-        child.kill().unwrap();
     }
 }
