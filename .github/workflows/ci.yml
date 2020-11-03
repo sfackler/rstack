@@ -55,8 +55,8 @@ jobs:
               ;;
           esac
 
-          apt-get update
-          apt-get install -y $packages
+          sudo apt-get update
+          sudo apt-get install -y $packages
       - name: Build libunwind
         run: |
           case ${{ matrix.target }} in
@@ -72,6 +72,6 @@ jobs:
 
           curl -L https://download.savannah.nongnu.org/releases/libunwind/libunwind-${{ matrix.version }}.tar.gz | tar -C /tmp -xf -
           cd /tmp/libunwind-${{ matrix.version }}
-          ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=/opt/libunwind $args
+          ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
           make -j$(nproc)
           make install
