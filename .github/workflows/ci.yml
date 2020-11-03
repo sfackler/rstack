@@ -86,6 +86,8 @@ jobs:
           ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
           make -j$(nproc)
           make install
+      - name: Setup eenvironment variables
+        run: |
           echo "PKG_CONFIG_PATH=$HOME/libunwind/lib/pkgconfig" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$HOME/libunwind/lib" >> $GITHUB_ENV
       - name: Systest
