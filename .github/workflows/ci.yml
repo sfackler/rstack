@@ -13,9 +13,7 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  build:
-    name: ${{ matrix.target }} ${{ matrix.version }}
-    runs-on: ubuntu-latest
+  libunwind:
     strategy:
       matrix:
         target:
@@ -25,6 +23,12 @@ jobs:
         version:
           # - 1.2.1
           - 1.4.0
+    name: libunwind ${{ matrix.target }} ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    env:
+      PKG_CONFIG_ALLOW_CROSS: 1
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64 -L /usr/aarch64-linux-gnu
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust
@@ -75,3 +79,6 @@ jobs:
           ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
           make -j$(nproc)
           make install
+          echo "PKG_CONFIG_PATH=$HOME/libunwind" >> $GITHUB_ENV
+      - name: Systest
+        run: cargo run --manifest-path unwind-systest/Cargo.toml --target ${{ matrix.target }}-unknown-linux-gnu
