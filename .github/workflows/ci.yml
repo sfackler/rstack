@@ -62,11 +62,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y $packages
       - name: Libunwind cache
+        id: libunwind-cache
         uses: actions/cache@v2
         with:
           path: ~/libunwind
           key: libunwind-${{ matrix.version }}-${{ matrix.target }}
       - name: Build libunwind
+        if: ${{ !steps.libunwind-cache.outputs.cache-hit }}
         run: |
           case ${{ matrix.target }} in
             x86_64)
