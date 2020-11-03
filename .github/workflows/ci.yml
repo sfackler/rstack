@@ -79,6 +79,6 @@ jobs:
           ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
           make -j$(nproc)
           make install
-          echo "PKG_CONFIG_PATH=$HOME/libunwind" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$HOME/libunwind/lib/pkgconfig" >> $GITHUB_ENV
       - name: Systest
         run: cargo run --manifest-path unwind-systest/Cargo.toml --target ${{ matrix.target }}-unknown-linux-gnu
