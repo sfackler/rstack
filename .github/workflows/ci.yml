@@ -70,7 +70,7 @@ jobs:
               args="CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++"
           esac
 
-          curl -L https://download.savannah.nongnu.org/releases/libunwind/libunwind-${{ matrix.version }}.tar.gz | tar -C /tmp -xf -
+          curl -L https://download.savannah.nongnu.org/releases/libunwind/libunwind-${{ matrix.version }}.tar.gz | tar -C /tmp -xzf -
           cd /tmp/libunwind-${{ matrix.version }}
           ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
           make -j$(nproc)
