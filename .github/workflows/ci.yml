@@ -80,5 +80,6 @@ jobs:
           make -j$(nproc)
           make install
           echo "PKG_CONFIG_PATH=$HOME/libunwind/lib/pkgconfig" >> $GITHUB_ENV
-      - name: Systest
+          echo "LD_LIBRARY_PATH=$HOME/libunwind/lib" >> $GITHUB_ENV
+      - name: Run systest
         run: cargo run --manifest-path unwind-systest/Cargo.toml --target ${{ matrix.target }}-unknown-linux-gnu
