@@ -38,7 +38,7 @@ jobs:
               version=nightly
               ;;
             *)
-              version=1.38.0
+              version=1.44.0
               ;;
           esac
 
