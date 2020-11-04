@@ -26,6 +26,7 @@ use libc::{
 };
 use log::debug;
 use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::error;
 use std::fmt;
@@ -370,7 +371,6 @@ where
     Ok(())
 }
 
-#[derive(PartialOrd, Ord, PartialEq, Eq)]
 struct TracedThread {
     id: u32,
     // True if TraceOptions::ptrace_attach was true (default value)
@@ -392,6 +392,27 @@ impl Drop for TracedThread {
         }
     }
 }
+
+// these need to be manually implemented to only work off of id so the borrow impl works
+impl PartialOrd for TracedThread {
+    fn partial_cmp(&self, other: &TracedThread) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TracedThread {
+    fn cmp(&self, other: &TracedThread) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl PartialEq for TracedThread {
+    fn eq(&self, other: &TracedThread) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for TracedThread {}
 
 impl Borrow<u32> for TracedThread {
     fn borrow(&self) -> &u32 {
