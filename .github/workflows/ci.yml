@@ -97,7 +97,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.cargo/registry/index
-          key: index-${{ runner.run_number }}
+          key: index-${{ github.run_id }}
           restore-keys: |
             index-
       - name: Create lockfile
