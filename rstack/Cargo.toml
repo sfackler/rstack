@@ -1,6 +1,6 @@
 [package]
 name = "rstack"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 edition = "2018"
 description = "Stack traces of remote processes"
@@ -22,4 +22,4 @@ libc = "0.2"
 log = "0.4"
 
 dw_ = { package = "dw", version = "0.2", path = "../dw", optional = true }
-unwind_ = { package = "unwind", version = "0.3", path = "../unwind", features = ["ptrace"], optional = true }
+unwind_ = { package = "unwind", version = "0.4", path = "../unwind", features = ["ptrace"], optional = true }
