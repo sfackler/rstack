@@ -45,6 +45,9 @@ jobs:
           rustup update $version
           rustup default $version
           rustup target add ${{ matrix.target }}-unknown-linux-gnu
+      - name: Get Rust version
+        id: rust-version
+        run: echo "::set-output name=version::$(rustc --version)"
       - name: Install cross compiler
         run: |
           case ${{ matrix.target }} in
@@ -86,10 +89,31 @@ jobs:
           ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
           make -j$(nproc)
           make install
-      - name: Setup eenvironment variables
+      - name: Setup environment variables
         run: |
           echo "PKG_CONFIG_PATH=$HOME/libunwind/lib/pkgconfig" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$HOME/libunwind/lib" >> $GITHUB_ENV
+      - name: Index cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ runner.run_number }}
+          restore-keys: |
+            index-
+      - name: Create lockfile
+        run: cargo generate-lockfile
+      - name: Registry cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ hashFiles('Cargo.lock') }}
+      - name: Fetch dependencies
+        run: cargo fetch
+      - name: Target cache
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: target-libunwind-${{ matrix.target }}-${{ matrix.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - name: Systest
         run: cargo run --manifest-path unwind-systest/Cargo.toml --target ${{ matrix.target }}-unknown-linux-gnu
       - name: Unwind test
