@@ -1,5 +1,4 @@
 # rstack
-[![CircleCI](https://circleci.com/gh/sfackler/rstack.svg?style=shield)](https://circleci.com/gh/sfackler/rstack)
 
 [Documentation](https://sfackler.github.io/rstack/doc/rstack)
 
