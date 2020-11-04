@@ -11,8 +11,54 @@ on:
 env:
   RUSTFLAGS: -D warnings
   RUST_BACKTRACE: 1
+  STABLE_VERSION: 1.44.0
 
 jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: Install Rust
+        run: |
+          rustup update $STABLE_VERSION
+          rustup default $STABLE_VERSION
+      - name: Get Rust version
+        id: rust-version
+        run: echo "::set-output name=version::$(rustc --version)"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libunwind-dev libdw-dev
+      - name: Index cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ github.run_id }}
+          restore-keys: |
+            index-
+      - name: Create lockfile
+        run: cargo generate-lockfile
+      - name: Registry cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ hashFiles('Cargo.lock') }}
+      - name: Fetch dependencies
+        run: cargo fetch
+      - name: Target cache
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: target-test-${{ matrix.target }}-${{ matrix.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - name: Test everything
+        run: cargo test
+      - name: Test rstack with libdw
+        run: cargo test --manifest-path rstack/Cargo.toml --no-default-features --features dw
+      - name: Test libunwind with features
+        run: cargo test --manifest-path unwind/Cargo.toml --all-features
+      - name: Dw systest
+        run: cargo run --manifest-path dw-systest/Cargo.toml
   libunwind:
     strategy:
       matrix:
@@ -38,7 +84,7 @@ jobs:
               version=nightly
               ;;
             *)
-              version=1.44.0
+              version=$STABLE_VERSION
               ;;
           esac
 
