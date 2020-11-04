@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+env:
+  RUSTFLAGS: -D warnings
+  RUST_BACKTRACE: 1
+  STABLE_VERSION: 1.44.0
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: |
+          rustup update $STABLE_VERSION
+          rustup default $STABLE_VERSION
+      - name: Get Rust version
+        id: rust-version
+        run: echo "::set-output name=version::$(rustc --version)"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libunwind-dev libdw-dev
+      - name: Index cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ github.run_id }}
+          restore-keys: |
+            index-
+      - name: Create lockfile
+        run: cargo generate-lockfile
+      - name: Registry cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ hashFiles('Cargo.lock') }}
+      - name: Fetch dependencies
+        run: cargo fetch
+      - name: Target cache
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: target-test-${{ matrix.target }}-${{ matrix.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - name: Test everything
+        run: cargo test
+      - name: Test rstack with libdw
+        run: cargo test --manifest-path rstack/Cargo.toml --no-default-features --features dw
+      - name: Test libunwind with features
+        run: cargo test --manifest-path unwind/Cargo.toml --all-features
+      - name: Dw systest
+        run: cargo run --manifest-path dw-systest/Cargo.toml
+  libunwind:
+    strategy:
+      matrix:
+        target:
+          - x86_64
+          - i686
+          - aarch64
+        version:
+          - 1.2.1
+          - 1.4.0
+    name: libunwind ${{ matrix.target }} ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    env:
+      PKG_CONFIG_ALLOW_CROSS: 1
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64 -L /usr/aarch64-linux-gnu
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        run: |
+          case ${{ matrix.target }} in
+            aarch64)
+              version=nightly
+              ;;
+            *)
+              version=$STABLE_VERSION
+              ;;
+          esac
+
+          rustup update $version
+          rustup default $version
+          rustup target add ${{ matrix.target }}-unknown-linux-gnu
+      - name: Get Rust version
+        id: rust-version
+        run: echo "::set-output name=version::$(rustc --version)"
+      - name: Install cross compiler
+        run: |
+          case ${{ matrix.target }} in
+            x86_64)
+              exit 0
+              ;;
+            i686)
+              packages=gcc-multilib
+              ;;
+            aarch64)
+              packages="gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user"
+              ;;
+          esac
+
+          sudo apt-get update
+          sudo apt-get install -y $packages
+      - name: Libunwind cache
+        id: libunwind-cache
+        uses: actions/cache@v2
+        with:
+          path: ~/libunwind
+          key: libunwind-${{ matrix.version }}-${{ matrix.target }}
+      - name: Build libunwind
+        if: ${{ !steps.libunwind-cache.outputs.cache-hit }}
+        run: |
+          case ${{ matrix.target }} in
+            x86_64)
+              args=
+              ;;
+            i686)
+              args=CFLAGS=-m32
+              ;;
+            aarch64)
+              args="CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++"
+          esac
+
+          curl -L https://download.savannah.nongnu.org/releases/libunwind/libunwind-${{ matrix.version }}.tar.gz | tar -C /tmp -xzf -
+          cd /tmp/libunwind-${{ matrix.version }}
+          ./configure --disable-static --host ${{ matrix.target }}-linux-gnu --target ${{ matrix.target }}-linux-gnu --prefix=$HOME/libunwind $args
+          make -j$(nproc)
+          make install
+      - name: Setup environment variables
+        run: |
+          echo "PKG_CONFIG_PATH=$HOME/libunwind/lib/pkgconfig" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$HOME/libunwind/lib" >> $GITHUB_ENV
+      - name: Index cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/index
+          key: index-${{ github.run_id }}
+          restore-keys: |
+            index-
+      - name: Create lockfile
+        run: cargo generate-lockfile
+      - name: Registry cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry/cache
+          key: registry-${{ hashFiles('Cargo.lock') }}
+      - name: Fetch dependencies
+        run: cargo fetch
+      - name: Target cache
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: target-libunwind-${{ matrix.target }}-${{ matrix.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+      - name: Systest
+        run: cargo run --manifest-path unwind-systest/Cargo.toml --target ${{ matrix.target }}-unknown-linux-gnu
+      - name: Unwind test
+        run: cargo test --manifest-path unwind/Cargo.toml --target ${{ matrix.target }}-unknown-linux-gnu
