@@ -50,7 +50,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: target
-          key: target-test-${{ matrix.target }}-${{ matrix.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+          key: target-test-${{ steps.rust-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
       - name: Test everything
         run: cargo test
       - name: Test rstack with libdw
