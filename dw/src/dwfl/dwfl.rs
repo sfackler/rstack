@@ -1,3 +1,5 @@
+use crate::dwfl::{make_dwfl_thread_callbacks, ThreadCallbacks};
+use crate::elf::ElfRef;
 use foreign_types::{foreign_type, ForeignType, ForeignTypeRef};
 use libc::{c_int, c_void, pid_t};
 use std::any::Any;
@@ -75,6 +77,30 @@ impl<'a> DwflRef<'a> {
                 pid as pid_t,
                 assume_ptrace_stopped,
             ))
+        }
+    }
+
+    /// Configures the session to use a set of custom callbacks to unwind.
+    ///
+    /// If provided, `elf` is used to determine the architecture of the modules. Otherwise, this is inferred from the
+    /// session's modules automatically.
+    pub fn attach_state<T>(
+        &mut self,
+        elf: Option<&'a ElfRef>,
+        pid: u32,
+        thread_callbacks: &'a mut T,
+    ) -> bool
+    where
+        T: ThreadCallbacks,
+    {
+        unsafe {
+            dw_sys::dwfl_attach_state(
+                self.as_ptr(),
+                elf.map_or(ptr::null_mut(), |e| e.as_ptr()),
+                pid as pid_t,
+                make_dwfl_thread_callbacks::<T>(),
+                (thread_callbacks as *mut T).cast::<c_void>(),
+            )
         }
     }
 

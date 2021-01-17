@@ -1,9 +1,9 @@
-use foreign_types::{ForeignTypeRef, Opaque};
-use libc::{c_int, c_void};
-use std::any::Any;
-use std::panic::{self, AssertUnwindSafe};
-
 use crate::dwfl::{cvt, DwflRef, Error, FrameRef};
+use foreign_types::{ForeignTypeRef, Opaque};
+use libc::{c_int, c_uint, c_void};
+use std::any::Any;
+use std::convert::TryFrom;
+use std::panic::{self, AssertUnwindSafe};
 
 /// A reference to a thread.
 pub struct ThreadRef(Opaque);
@@ -24,6 +24,24 @@ impl ThreadRef {
     /// Returns the thread's ID.
     pub fn tid(&self) -> u32 {
         unsafe { dw_sys::dwfl_thread_tid(self.as_ptr()) as u32 }
+    }
+
+    /// Used by the [`ThreadCallbacks::set_initial_registers`](crate::dwfl::ThreadCallbacks::set_initial_registers)
+    /// method to initialize the thread's registers.
+    ///
+    /// Registers are set in a contiguous block starting at `firstreg`.
+    pub fn state_registers(&mut self, firstreg: usize, regs: &[u64]) -> bool {
+        let firstreg = c_int::try_from(firstreg).expect("firstreg overflow");
+        let nregs = c_uint::try_from(regs.len()).expect("regs length overflow");
+        unsafe {
+            dw_sys::dwfl_thread_state_registers(self.as_ptr(), firstreg, nregs, regs.as_ptr())
+        }
+    }
+
+    /// Used by the [`ThreadCallbacks::set_initial_registers`](crate::dwfl::ThreadCallbacks::set_initial_registers)
+    /// method to initialize the thread's PC if not covered in the registers set by [`Self::state_registers`].
+    pub fn state_register_pc(&mut self, pc: u64) {
+        unsafe { dw_sys::dwfl_thread_state_register_pc(self.as_ptr(), pc) }
     }
 
     /// Iterates through the frames of the thread.
