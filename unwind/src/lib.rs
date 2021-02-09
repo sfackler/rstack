@@ -238,6 +238,9 @@ impl RegNum {
     pub const SP: RegNum = RegNum(UNW_REG_SP);
 }
 
+#[cfg(any(target_arch = "x86_64", doc))]
+mod x86_64;
+
 /// Information about a procedure.
 #[derive(Copy, Clone)]
 pub struct ProcedureInfo {
