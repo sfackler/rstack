@@ -2,6 +2,7 @@
 name = "unwind-systest"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@palantir.com>"]
+edition = "2018"
 
 [features]
 ptrace = ["unwind-sys/ptrace"]
@@ -11,4 +12,4 @@ unwind-sys = { path = "../unwind-sys" }
 libc = "0.2"
 
 [build-dependencies]
-ctest = "0.2"
+ctest2 = "0.4"
