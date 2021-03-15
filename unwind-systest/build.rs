@@ -1,9 +1,7 @@
-extern crate ctest;
-
 use std::env;
 
 fn main() {
-    let mut cfg = ctest::TestGenerator::new();
+    let mut cfg = ctest2::TestGenerator::new();
 
     let includedir = env::var_os("DEP_UNWIND_INCLUDEDIR").unwrap();
     cfg.include(includedir);
@@ -59,7 +57,13 @@ fn main() {
             ("unw_save_loc_t", "u") => true,
             _ => false,
         })
-        // roundtrip tests rely on UB :(
-        .skip_roundtrip(|_| true)
+        // i686 ABI disagrees about how to handle ZST-by-value
+        .skip_roundtrip(|t| {
+            env::var("TARGET").unwrap().contains("i686")
+                && match t {
+                    "unw_tdep_save_loc_t" | "unw_tdep_proc_info_t" => true,
+                    _ => false,
+                }
+        })
         .generate("../unwind-sys/src/lib.rs", "all.rs");
 }

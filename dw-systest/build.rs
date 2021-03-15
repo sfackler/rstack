@@ -1,9 +1,7 @@
-extern crate ctest;
-
 use std::env;
 
 fn main() {
-    let mut cfg = ctest::TestGenerator::new();
+    let mut cfg = ctest2::TestGenerator::new();
 
     let includedir = env::var_os("DEP_DW_INCLUDEDIR").unwrap();
     cfg.include(includedir);
@@ -16,7 +14,5 @@ fn main() {
             "GElf_Phdr" | "GElf_Shdr" | "GElf_Sym" | "Dwarf_OOM" => true,
             _ => false,
         })
-        // roundtrip tests rely on UB :(
-        .skip_roundtrip(|_| true)
         .generate("../dw-sys/src/lib.rs", "all.rs");
 }
