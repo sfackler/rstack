@@ -57,5 +57,13 @@ fn main() {
             ("unw_save_loc_t", "u") => true,
             _ => false,
         })
+        // i686 ABI disagrees about how to handle ZST-by-value
+        .skip_roundtrip(|t| {
+            env::var("TARGET").unwrap().contains("i686")
+                && match t {
+                    "unw_tdep_save_loc_t" | "unw_tdep_proc_info_t" => true,
+                    _ => false,
+                }
+        })
         .generate("../unwind-sys/src/lib.rs", "all.rs");
 }
