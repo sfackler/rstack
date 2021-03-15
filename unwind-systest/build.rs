@@ -57,7 +57,5 @@ fn main() {
             ("unw_save_loc_t", "u") => true,
             _ => false,
         })
-        // roundtrip tests rely on UB :(
-        .skip_roundtrip(|_| true)
         .generate("../unwind-sys/src/lib.rs", "all.rs");
 }

@@ -14,7 +14,5 @@ fn main() {
             "GElf_Phdr" | "GElf_Shdr" | "GElf_Sym" | "Dwarf_OOM" => true,
             _ => false,
         })
-        // roundtrip tests rely on UB :(
-        .skip_roundtrip(|_| true)
         .generate("../dw-sys/src/lib.rs", "all.rs");
 }
