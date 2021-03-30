@@ -11,7 +11,7 @@ fn main() {
     let library = pkg_config::probe_library(lib).unwrap();
 
     // There were some ABI changes from 1.1 to 1.2 on x86_64
-    let mut it = library.version.split(".");
+    let mut it = library.version.split(&['.', '-'][..]);
     let major = it.next().unwrap().parse::<u32>().unwrap();
     let mut minor = it.next().unwrap().parse::<u32>().unwrap();
     // the pkg-config version is messed up in old versions and reports e.g. 1.21 for 1.2.1!
