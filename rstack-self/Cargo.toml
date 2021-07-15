@@ -26,4 +26,4 @@ bincode = "1.0"
 rstack = { version = "0.3.0", path = "../rstack", default-features = false }
 
 [dev-dependencies]
-env_logger = "0.8"
+env_logger = "0.9"
