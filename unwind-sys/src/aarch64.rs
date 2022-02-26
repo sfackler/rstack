@@ -145,7 +145,7 @@ cfg_if! {
 macro_rules! unw_tdep_getcontext {
     ($uc:expr) => {{
         let unw_ctx: *mut $crate::unw_tdep_context_t = $uc;
-        asm!(
+        core::arch::asm!(
             "stp x0, x1, [x0, #0]",
             "stp x2, x3, [x0, #16]",
             "stp x4, x5, [x0, #32]",
