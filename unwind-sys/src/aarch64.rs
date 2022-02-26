@@ -149,36 +149,76 @@ cfg_if! {
     }
 }
 
-#[macro_export]
-macro_rules! unw_tdep_getcontext {
-    ($uc:expr) => {{
-        let unw_ctx: *mut $crate::unw_tdep_context_t = $uc;
-        core::arch::asm!(
-            "stp x0, x1, [x0, #0]",
-            "stp x2, x3, [x0, #16]",
-            "stp x4, x5, [x0, #32]",
-            "stp x6, x7, [x0, #48]",
-            "stp x8, x9, [x0, #64]",
-            "stp x10, x11, [x0, #80]",
-            "stp x12, x13, [x0, #96]",
-            "stp x14, x15, [x0, #112]",
-            "stp x16, x17, [x0, #128]",
-            "stp x18, x19, [x0, #144]",
-            "stp x20, x21, [x0, #160]",
-            "stp x22, x23, [x0, #176]",
-            "stp x24, x25, [x0, #192]",
-            "stp x26, x27, [x0, #208]",
-            "stp x28, x29, [x0, #224]",
-            "str x30, [x0, #240]",
-            "mov x1, sp",
-            "stp x1, x30, [x0, #248]",
-            in("x0") (*unw_ctx).uc_mcontext.regs.as_ptr(),
-            out("x1") _,
-            options(nostack),
-        );
+cfg_if! {
+    if #[cfg(pre16)] {
+        #[macro_export]
+        macro_rules! unw_tdep_getcontext {
+            ($uc:expr) => {{
+                let unw_ctx: *mut $crate::unw_tdep_context_t = $uc;
+                core::arch::asm!(
+                    "stp x0, x1, [x0, #0]",
+                    "stp x2, x3, [x0, #16]",
+                    "stp x4, x5, [x0, #32]",
+                    "stp x6, x7, [x0, #48]",
+                    "stp x8, x9, [x0, #64]",
+                    "stp x10, x11, [x0, #80]",
+                    "stp x12, x13, [x0, #96]",
+                    "stp x14, x15, [x0, #112]",
+                    "stp x16, x17, [x0, #128]",
+                    "stp x18, x19, [x0, #144]",
+                    "stp x20, x21, [x0, #160]",
+                    "stp x22, x23, [x0, #176]",
+                    "stp x24, x25, [x0, #192]",
+                    "stp x26, x27, [x0, #208]",
+                    "stp x28, x29, [x0, #224]",
+                    "str x30, [x0, #240]",
+                    "mov x1, sp",
+                    "stp x1, x30, [x0, #248]",
+                    in("x0") (*unw_ctx).uc_mcontext.regs.as_ptr(),
+                    out("x1") _,
+                    options(nostack),
+                );
 
-        0
-    }};
+                0
+            }};
+        }
+    } else {
+        #[macro_export]
+        macro_rules! unw_tdep_getcontext {
+            ($uc:expr) => {{
+                let unw_ctx: *mut $crate::unw_tdep_context_t = $uc;
+                let mut unw_base = (*unw_ctx).uc_mcontext.regs.as_ptr();
+                core::arch::asm!(
+                    "stp x0, x1, [x0, #0]",
+                    "stp x2, x3, [x0, #16]",
+                    "stp x4, x5, [x0, #32]",
+                    "stp x6, x7, [x0, #48]",
+                    "stp x8, x9, [x0, #64]",
+                    "stp x10, x11, [x0, #80]",
+                    "stp x12, x13, [x0, #96]",
+                    "stp x14, x15, [x0, #112]",
+                    "stp x16, x17, [x0, #128]",
+                    "stp x18, x19, [x0, #144]",
+                    "stp x20, x21, [x0, #160]",
+                    "stp x22, x23, [x0, #176]",
+                    "stp x24, x25, [x0, #192]",
+                    "stp x26, x27, [x0, #208]",
+                    "stp x28, x29, [x0, #224]",
+                    "mov x1, sp",
+                    "stp x30, x1, [x0, #240]",
+                    "adr x1, 2f",
+                    "str x1, [x0, #256]",
+                    "mov x0, #0",
+                    "2:",
+                    inout("x0") unw_base,
+                    out("x1") _,
+                    options(nostack),
+                );
+
+                unw_base as i32
+            }};
+        }
+    }
 }
 
 extern "C" {
