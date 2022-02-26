@@ -283,8 +283,7 @@ pub struct Context(#[doc(hidden)] pub unw_context_t, PhantomPinned);
 
 /// Creates a `Context` pinned to the stack.
 ///
-/// This is a macro rather than a function due to the implementation of the libunwind library. On `aarch64` targets,
-/// calling this macro requires a nightly compiler.
+/// This is a macro rather than a function due to the implementation of the libunwind library.
 ///
 /// # Example
 ///
