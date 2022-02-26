@@ -11,7 +11,7 @@ on:
 env:
   RUSTFLAGS: -D warnings
   RUST_BACKTRACE: 1
-  STABLE_VERSION: 1.51.0
+  STABLE_VERSION: 1.59.0
 
 jobs:
   test:
@@ -68,7 +68,7 @@ jobs:
           - aarch64
         version:
           - 1.2.1
-          - 1.4.0
+          - 1.6.2
     name: libunwind ${{ matrix.target }} ${{ matrix.version }}
     runs-on: ubuntu-latest
     env:
@@ -79,17 +79,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rust
         run: |
-          case ${{ matrix.target }} in
-            aarch64)
-              version=nightly
-              ;;
-            *)
-              version=$STABLE_VERSION
-              ;;
-          esac
-
-          rustup update $version
-          rustup default $version
+          rustup update $STABLE_VERSION
+          rustup default $STABLE_VERSION
           rustup target add ${{ matrix.target }}-unknown-linux-gnu
       - name: Get Rust version
         id: rust-version

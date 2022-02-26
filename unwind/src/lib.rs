@@ -37,7 +37,6 @@
 //!
 //! [libunwind]: http://www.nongnu.org/libunwind/
 #![doc(html_root_url = "https://sfackler.github.io/rstack/doc")]
-#![cfg_attr(target_arch = "aarch64", feature(asm))]
 #![warn(missing_docs)]
 
 use foreign_types::Opaque;
