@@ -1,5 +1,3 @@
-#![cfg_attr(target_arch = "aarch64", feature(asm))]
-
 use unwind::{get_context, Cursor, RegNum};
 
 #[test]

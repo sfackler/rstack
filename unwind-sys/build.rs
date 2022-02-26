@@ -27,6 +27,9 @@ fn main() {
     if major < 1 || (major == 1 && minor < 4) {
         println!("cargo:rustc-cfg=pre14");
     }
+    if major < 1 || (major == 1 && minor < 6) {
+        println!("cargo:rustc-cfg=pre16");
+    }
 
     println!("cargo:version={}", library.version);
     let includedir = pkg_config::get_variable(lib, "includedir").unwrap();

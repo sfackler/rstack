@@ -114,9 +114,17 @@ cfg_if! {
             __reserved: unw_sigcontext_padding,
         }
 
+        cfg_if! {
+            if #[cfg(pre16)] {
+                const PADDING_BYTES: usize = 34;
+            } else {
+                const PADDING_BYTES: usize = 66;
+            }
+        }
+
         #[derive(Copy, Clone)]
         #[repr(align(16))]
-        struct unw_sigcontext_padding([u8; 34 * 8]);
+        struct unw_sigcontext_padding([u8; PADDING_BYTES * 8]);
 
         #[repr(C)]
         #[derive(Copy, Clone)]
