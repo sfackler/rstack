@@ -37,6 +37,7 @@ fn local() {
 }
 
 #[test]
+#[cfg(not(pre16))]
 #[cfg(target_arch = "x86_64")]
 fn x86_64() {
     macro_rules! dump_register {

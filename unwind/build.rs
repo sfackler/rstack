@@ -8,4 +8,7 @@ fn main() {
     if major < 1 || (major == 1 && minor < 2) {
         println!("cargo:rustc-cfg=pre12");
     }
+    if major < 1 || (major == 1 && minor < 6) {
+        println!("cargo:rustc-cfg=pre16");
+    }
 }

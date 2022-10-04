@@ -237,6 +237,7 @@ impl RegNum {
     pub const SP: RegNum = RegNum(UNW_REG_SP);
 }
 
+#[cfg(not(pre16))]
 #[cfg(target_arch = "x86_64")]
 mod x86_64;
 
