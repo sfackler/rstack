@@ -221,7 +221,7 @@ pub struct AddressSpaceRef<T>(Opaque, PhantomData<T>);
 
 impl<T> AddressSpaceRef<T> {
     fn as_ptr(&self) -> unw_addr_space_t {
-        unsafe { &mut *(self as *const _ as *mut _) }
+        self as *const _ as *mut _
     }
 }
 
