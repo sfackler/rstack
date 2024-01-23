@@ -11,7 +11,7 @@ on:
 env:
   RUSTFLAGS: -D warnings
   RUST_BACKTRACE: 1
-  STABLE_VERSION: 1.59.0
+  STABLE_VERSION: 1.71.0
 
 jobs:
   test:
