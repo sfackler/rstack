@@ -574,3 +574,19 @@ impl TracedThread {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::trace;
+    use target_launcher::CaptureTarget;
+
+    #[test]
+    fn capturing_trace_succeeds() {
+        let target = CaptureTarget::start().expect("Starting capture-target failed.");
+        let process =
+            trace(target.process_id()).expect("Capturing process trace of capture-target failed.");
+        assert_eq!(process.id, target.process_id());
+        assert!(process.threads().len() > 0);
+        target.stop().expect("Stopping capture-target failed.");
+    }
+}

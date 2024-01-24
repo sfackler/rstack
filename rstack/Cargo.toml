@@ -23,3 +23,6 @@ log = "0.4"
 
 dw_ = { package = "dw", version = "0.2", path = "../dw", optional = true }
 unwind_ = { package = "unwind", version = "0.4", path = "../unwind", features = ["ptrace"], optional = true }
+
+[dev-dependencies]
+target-launcher = { version = "0.1.0", path = "test/target-launcher"}

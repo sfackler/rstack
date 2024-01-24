@@ -1,5 +1,7 @@
 /target/
+/rstack/test/capture-target/target/
 **/*.rs.bk
 Cargo.lock
 
 .vscode/
+.idea/
