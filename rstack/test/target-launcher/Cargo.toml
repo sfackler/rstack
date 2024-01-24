@@ -1,0 +1,11 @@
+[package]
+name = "target-launcher"
+version = "0.1.0"
+authors = ["Juha Lepola <juha.lepola@gmail.com>"]
+edition = "2018"
+description = "Utility for running helper process for testing the rstack."
+license = "MIT/Apache-2.0"
+repository = "https://github.com/sfackler/rstack"
+
+[build-dependencies]
+escargot = "0.5.8"

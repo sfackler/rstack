@@ -1,0 +1,15 @@
+[package]
+name = "capture-target"
+version = "0.1.0"
+authors = ["Juha Lepola <juha.lepola@gmail.com>"]
+edition = "2018"
+description = "Simple helper process for testing the rstack."
+license = "MIT/Apache-2.0"
+repository = "https://github.com/sfackler/rstack"
+
+# Ensure debug info is always present to provide readable callstacks when capturing.
+[profile.release]
+debug = true
+
+# Workaround for the cargo issue #6745. See https://github.com/rust-lang/cargo/issues/6745#issuecomment-472667516
+[workspace]
